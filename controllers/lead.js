@@ -1,6 +1,8 @@
 const express = require("express");
 const app = express.Router();
-// const multer = require("multer");
+const multer = require("multer");
+const xlsx = require("xlsx");
+const path = require("path");
 
 const connection = require("../db");
 //access_type_mast post api
@@ -392,12 +394,12 @@ app.post("/leadmastpost", async (req, res) => {
     const leadSource = leadsource || 0;
     const leadType = leadtype || 0;
     const Dept = dept || 0;
-    const Status = status || "";
+    const Status = status || "fresh";
     const Loc = loc || 0;
     const Email = email || "";
     const Addr = addr || "";
     const City = city || "";
-    const State = state || "";
+    const State = state || "open";
     const Country = country || "";
     const Remarks = remarks || "";
     const assignTo = assign_to || 0;
@@ -568,5 +570,62 @@ app.delete("/leadmastdelete/:id", (req, res) => {
       res.status(200).send({ message });
     }
   );
+});
+
+// 24/08/2023 bupload data excel
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "uploads/");
+  },
+  filename: (req, file, cb) => {
+    const currentDate = new Date().toISOString().slice(0, 10); // YYYY-MM-DD format
+    const hours = new Date().getHours(); // Current hours
+    const minutes = new Date().getMinutes(); // Current minutes
+    const seconds = new Date().getSeconds(); // Current seconds
+    const originalFileName = path.parse(file.originalname).name;
+    const fileExtension = path.extname(file.originalname);
+    const newFileName = `${currentDate} -${hours}-${minutes}-${seconds} ${originalFileName}${fileExtension}`;
+    cb(null, newFileName);
+  },
+});
+
+const upload = multer({ storage: storage });
+app.post("/upload", upload.single("file"), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: "No file uploaded" });
+  }
+
+  const filePath = req.file.path;
+  const workbook = xlsx.readFile(filePath);
+  const sheetName = workbook.SheetNames[0];
+  const worksheet = workbook.Sheets[sheetName];
+
+  const jsonData = xlsx.utils.sheet_to_json(worksheet);
+
+  const rowSet = new Set();
+  const duplicateRows = [];
+  const uniqueRows = [];
+
+  jsonData.forEach((row) => {
+    const rowString = JSON.stringify(row.mobile_no);
+    if (rowSet.has(rowString)) {
+      duplicateRows.push(row);
+    } else {
+      rowSet.add(rowString);
+      uniqueRows.push(row);
+    }
+  });
+
+  const totalRows = jsonData.length;
+  const duplicateRowsCount = duplicateRows.length;
+  const uniqueRowsCount = uniqueRows.length;
+
+  res.json({
+    message: "File Uploaded Successfully",
+    totalRows,
+    duplicateRowsCount,
+    uniqueRowsCount,
+  });
 });
 module.exports = app;

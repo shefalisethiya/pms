@@ -1,7 +1,7 @@
 const express = require("express");
 const app = express.Router();
-const multer = require("multer");
-
+// const multer = require("multer");
+const https = require("https");
 const connection = require("../db");
 //post ipalloc data
 app.post("/ipalloc", async (req, res) => {
@@ -918,4 +918,312 @@ app.get("/dataofiphistory/:ip_id", (req, res) => {
     return res.json(results);
   });
 });
+
+app.post("/dataforgraph", (req, res) => {
+  const requestedDate = req.body.dateFormat;
+  const requestedStartDate = req.body.start_date;
+  const requestedEndDate = req.body.end_date;
+  const bodyId = req.body.ip_id;
+  let query;
+
+  if (requestedDate) {
+    if (requestedDate.length === 4) {
+      // Year format like 'YYYY'
+      query = `SELECT followers,post_count FROM Ip_count_mast WHERE ip_id=? AND last_updated_at LIKE '${requestedDate}%'`;
+    } else if (requestedDate.length === 7) {
+      // Year and month format like 'YYYY-MM'
+      query = `SELECT followers,post_count FROM Ip_count_mast WHERE ip_id=? AND last_updated_at LIKE '${requestedDate}%'`;
+    } else {
+      res.status(400).json({ error: "Invalid date format" });
+      return;
+    }
+
+    connection.query(query, [req.body.ip_id], (err, results) => {
+      if (err) {
+        console.error("Error querying the database:", err);
+        res.status(500).json({ error: "Internal server error" });
+      } else {
+        if (results.length === 0) {
+          res
+            .status(404)
+            .json({ error: "Data not found for the requested date" });
+        } else {
+          const followersData = results.map((result) => result.followers);
+          if (requestedDate.length === 4 && followersData.length < 12) {
+            const missingCount = 12 - followersData.length;
+            const missingFollowers = Array.from(
+              { length: missingCount },
+              () => 0
+            );
+            followersData.push(...missingFollowers);
+          }
+
+          const postCountData = results.map((result) => result.post_count);
+          if (requestedDate.length === 4 && postCountData.length < 12) {
+            const missingCount = 12 - postCountData.length;
+            const missingPostCounts = Array.from(
+              { length: missingCount },
+              () => 0
+            );
+            postCountData.push(...missingPostCounts);
+          }
+
+          const registerQuery =
+            "select * from Ip_register_mast where ip_regist_id = ?";
+          connection.query(
+            registerQuery,
+            [req.body.ip_id],
+            (registerErr, registerResults) => {
+              if (registerErr) {
+                console.error("Error querying the database:", registerErr);
+                res.status(500).json({ error: "Internal server error" });
+              } else {
+                if (results.length === 0) {
+                  res
+                    .status(404)
+                    .json({ error: "Data not found for the requested date" });
+                } else {
+                  const ipRegisterData = registerResults[0]; // Assuming ip_regist_id is unique
+
+                  res.json({
+                    followers: followersData,
+                    ipRegisterData,
+                    postcounts: postCountData,
+                  });
+                }
+              }
+            }
+          );
+        }
+      }
+    });
+  } else if (requestedStartDate && requestedEndDate) {
+    const startDate = new Date(requestedStartDate);
+    const endDate = new Date(requestedEndDate);
+
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      res.status(400).json({ error: "Invalid startDate or endDate format" });
+      return;
+    }
+
+    const query = `
+      SELECT followers,post_count, last_updated_at
+      FROM Ip_count_mast
+      WHERE ip_id = ?
+      AND last_updated_at >= ?
+      AND last_updated_at <= ?
+    `;
+
+    connection.query(query, [bodyId, startDate, endDate], (err, results) => {
+      if (err) {
+        console.error("Error querying the database:", err);
+        res.status(500).json({ error: "Internal server error" });
+      } else {
+        const followersData = {};
+        const postCountData = {};
+
+        // Initialize followersData with 0 for each month within the range
+        const currentDate = new Date(startDate);
+        while (currentDate <= endDate) {
+          followersData[currentDate.toISOString().substr(0, 7)] = 0;
+          currentDate.setMonth(currentDate.getMonth() + 1);
+
+          postCountData[currentDate.toISOString().substr(0, 7)] = 0;
+          currentDate.setMonth(currentDate.getMonth() + 1);
+        }
+
+        // Fill in actual followers count from the query results
+        results.forEach((result) => {
+          const resultDate = result.last_updated_at.toISOString().substr(0, 7);
+          followersData[resultDate] = result.followers;
+          postCountData[resultDate] = result.post_count;
+        });
+
+        const registerQuery =
+          "SELECT * FROM Ip_register_mast WHERE ip_regist_id = ?";
+        connection.query(
+          registerQuery,
+          [bodyId],
+          (registerErr, registerResults) => {
+            if (registerErr) {
+              console.error("Error querying the database:", registerErr);
+              res.status(500).json({ error: "Internal server error" });
+            } else {
+              const ipRegisterData = registerResults[0]; // Assuming ip_regist_id is unique
+              res.json({
+                followers: followersData,
+                ipRegisterData,
+                postcounts: postCountData,
+              });
+            }
+          }
+        );
+      }
+    });
+  } else {
+    res.status(400).json({ error: "Missing required parameters" });
+  }
+});
+
+app.post("/instagram", async (req, res) => {
+  const { IPName } = req.body;
+  const requestBody = JSON.stringify({
+    request_type: "creators",
+    request_entries: [`https://www.instagram.com/${IPName}`],
+  });
+  const token =
+    "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZCI6IjYzYWVhY2Q2ZjUzYWZkNDQ1YWIxYjBlNSIsIm5hbWUiOiJjcmVhdGl2ZWZ1ZWwiLCJleHAiOjE3MTc2NDE3NTQsInJvbGUiOiJDTElFTlQiLCJwZXJtaXNzaW9ucyI6W10sInNlc3Npb24iOiI2NjI4OWUxNy1kMzhhLTRiMGQtOWQ0OS1kNDNjN2FlYmY2ZTkifQ.2FOqqjke66EiK0WJa1iBbbDrQdlzoTrpDRhGhjbtRww";
+  const options = {
+    hostname: "app.ylytic.com",
+    path: "https://app.ylytic.com/ylytic/admin/api/v1/data_requests",
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  };
+  const externalRequest = https.request(options, (externalResponse) => {
+    let responseData = "";
+    externalResponse.on("data", (chunk) => {
+      responseData += chunk;
+    });
+    externalResponse.on("end", () => {
+      res.json(JSON.parse(responseData));
+    });
+  });
+  externalRequest.on("error", (error) => {
+    console.error("API call error:", error);
+    res
+      .status(500)
+      .json({ error: "An error occurred while making the API call" });
+  });
+  externalRequest.write(requestBody);
+  externalRequest.end();
+});
+app.get("/instagram2/:id", async (req, res) => {
+  const token =
+    "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZCI6IjYzYWVhY2Q2ZjUzYWZkNDQ1YWIxYjBlNSIsIm5hbWUiOiJjcmVhdGl2ZWZ1ZWwiLCJleHAiOjE3MTc2NDE3NTQsInJvbGUiOiJDTElFTlQiLCJwZXJtaXNzaW9ucyI6W10sInNlc3Npb24iOiI2NjI4OWUxNy1kMzhhLTRiMGQtOWQ0OS1kNDNjN2FlYmY2ZTkifQ.2FOqqjke66EiK0WJa1iBbbDrQdlzoTrpDRhGhjbtRww";
+  const options = {
+    hostname: "app.ylytic.com",
+    path: `https://app.ylytic.com/ylytic/admin/api/v1/data_requests/${req.params.id}`,
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  };
+  const req1 = https.request(options, (responseFromAPI) => {
+    let data = "";
+    responseFromAPI.on("data", (chunk) => {
+      data += chunk;
+    });
+    responseFromAPI.on("end", () => {
+      const parsedData = JSON.parse(data);
+      res.status(200).json(parsedData);
+    });
+  });
+  req1.on("error", (error) => {
+    console.error("An error occurred:", error);
+    res.status(500).json({ error: "An error occurred" });
+  });
+  req1.end();
+});
+// 2/9/23
+// const fetch = require("node-fetch");
+// const token =
+//   "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZCI6IjYzYWVhY2Q2ZjUzYWZkNDQ1YWIxYjBlNSIsIm5hbWUiOiJjcmVhdGl2ZWZ1ZWwiLCJleHAiOjE3MTc2NDE3NTQsInJvbGUiOiJDTElFTlQiLCJwZXJtaXNzaW9ucyI6W10sInNlc3Npb24iOiI2NjI4OWUxNy1kMzhhLTRiMGQtOWQ0OS1kNDNjN2FlYmY2ZTkifQ.2FOqqjke66EiK0WJa1iBbbDrQdlzoTrpDRhGhjbtRww";
+
+// const token = "<your_token_here>"; // Replace with your actual token
+
+// Endpoint to create a track using the Track Creator API
+// app.post("/track_creator", async (req, res) => {
+//   try {
+//     const trackCreatorParams = {
+//       connector: "instagram",
+//       handle: "ishinna_b_sadana",
+//       cron_expression: "*/15 * * * *",
+//     };
+
+//     const response = await fetch(
+//       "https://app.ylytic.com/ylytic/admin/api/v1/track_creator",
+//       {
+//         method: "POST",
+//         headers: {
+//           Authorization: `Bearer ${token}`,
+//           "Content-Type": "application/json",
+//         },
+//         body: JSON.stringify(trackCreatorParams),
+//       }
+//     );
+
+//     const responseData = await response.json();
+
+//     res.status(response.status).json(responseData);
+//   } catch (error) {
+//     console.error("Error creating track creator:", error.message);
+//     res.status(500).json({ error: "Failed to create track creator" });
+//   }
+// });
+
+// Endpoint to create a track using the Track Post API
+// app.post("/track_creator", async (req, res) => {
+//   try {
+//     const trackCreatorParams = {
+//       connector: "instagram",
+//       handle: "ishinna_b_sadana",
+//       cron_expression: "*/15 * * * *",
+//     };
+
+//     const response = await fetch(
+//       "https://app.ylytic.com/ylytic/admin/api/v1/track_creator",
+//       {
+//         method: "POST",
+//         headers: {
+//           Authorization: `Bearer ${token}`,
+//           "Content-Type": "application/json",
+//         },
+//         body: JSON.stringify(trackCreatorParams),
+//       }
+//     );
+
+//     const responseData = await response.json();
+
+//     res.status(response.status).json(responseData);
+//   } catch (error) {
+//     console.error("Error creating track creator:", error.message);
+//     res.status(500).json({ error: "Failed to create track creator" });
+//   }
+// });
+
+/// track post
+// const axios = require("axios");
+
+// Replace <token> with your actual token
+// const token = "<your_token_here>";
+
+// Define the parameters for the POST request
+// const trackPostParams = {
+//   connector: "instagram",
+//   shortcode: "CwK7EUGIiGA",
+//   cron_expression: "*/15 * * * *",
+// };
+
+// Define the URL for the Track Post API
+// const trackPostUrl = "https://app.ylytic.com/ylytic/admin/api/v1/track_post";
+
+// Set up the headers for the request
+// const headers = {
+//   Authorization: `Bearer ${token}`,
+// };
+
+// Make the POST request using axios
+// axios
+//   .post(trackPostUrl, trackPostParams, { headers })
+//   .then((response) => {
+//     console.log("Track created successfully:", response.data);
+//   })
+//   .catch((error) => {
+//     console.error("Error creating track:", error.message);
+//   });
+
 module.exports = app;

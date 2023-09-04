@@ -268,4 +268,29 @@ app.get("/sittingdatabyid/:sitting_id", async (req, res) => {
     res.status(500).send("Error retrieving sitting data from the database");
   }
 });
+// 2/9/23 those sitting data which is not exist in user_mast
+app.get("/notallocsitting", (req, res) => {
+  console.log("Retrieving all Sitting information");
+
+  const query = `
+    SELECT s.*
+    FROM Sitting_mast AS s
+    LEFT JOIN user_mast AS u ON s.Sitting_id = u.Sitting_id
+    WHERE u.Sitting_id IS NULL
+  `;
+
+  // Send the query to the MySQL database and handle any errors or data retrieved
+  connection.query(query, (err, results) => {
+    if (err) {
+      console.error(err);
+      res.sendStatus(500); // Send HTTP status code 500 for server error
+      return;
+    }
+
+    const data = results; // Store the retrieved data in a variable
+
+    res.send({ data: data }); // Send the data back to the client
+  });
+});
+
 module.exports = app;

@@ -113,4 +113,17 @@ app.post("/obj", async (req, res) => {
       );
   }
 });
+
+app.get("/allobj", (req, res) => {
+  // console.log("get dept api hit");
+  connection.query(`SELECT * FROM object_mast`, (err, results) => {
+    if (err) {
+      // console.error(err);
+      res.sendStatus(500);
+      return;
+    }
+    // console.log(results);
+    res.send(results);
+  });
+});
 module.exports = app;
