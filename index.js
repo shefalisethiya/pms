@@ -9,6 +9,11 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cors());
 
+app.use('/product_images', express.static(__dirname + '/product_images'));
+app.use('/uploads', express.static(__dirname + '/uploads'));
+app.use('/logo_images', express.static(__dirname + '/logo_images'));
+app.use('/user_images', express.static(__dirname + '/user_images'));
+
 // Import user routes
 const userRoutes = require("./controllers/user");
 const deptRoutes = require("./controllers/dept");
@@ -23,9 +28,11 @@ app.use(announcementRoutes);
 app.use(attendenceRoutes);
 app.use(desiRoutes);
 const ipRoutes = require("./controllers/ip");
+const instaRoutes = require("./controllers/insta");
 const jobresponRoutes = require("./controllers/jobrespon");
 const kraRoutes = require("./controllers/kra");
 app.use(ipRoutes);
+app.use(instaRoutes);
 app.use(jobresponRoutes);
 app.use(kraRoutes);
 const leadRoutes = require("./controllers/lead");

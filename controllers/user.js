@@ -3,8 +3,9 @@ const app = express.Router();
 const multer = require("multer");
 // const nodemailer = require("nodemailer");
 const path = require("path");
+const jwt = require("jsonwebtoken");
 const connection = require("../db"); // Make sure to adjust the path as necessary necessary
-// const multer = require("multer");
+
 //get allusers
 app.get("/allusers", (req, res) => {
   console.log(
@@ -101,64 +102,126 @@ app.get("/user/:id", async (req, res) => {
   }
 });
 // check code 6:02
-app.get("/usernew/:id", (req, res) => {
-  const userId = req.params.id; // Get the user ID from the URL parameter
-  console.log(`Retrieving user data for user ID: ${userId}`);
+// app.get("/usernew/:id", (req, res) => {
+//   const userId = req.params.id; // Get the user ID from the URL parameter
+//   console.log(`Retrieving user data for user ID: ${userId}`);
 
-  const query = `
-    SELECT 
-      u.*, 
-      d.dept_name AS department_name, 
-      rm.Role_name AS Role_name, 
-      u2.user_name AS report,
-      u3.user_name AS Report_L1N_name,
-      u4.user_name AS Report_L2N_name,
-      u5.user_name AS Report_L3N,
-      dm.desi_name AS designation_name
-    FROM 
-      user_mast AS u
-      LEFT JOIN dept_mast AS d ON u.dept_id = d.dept_id
-      LEFT JOIN designation_mast AS dm ON u.user_designation = dm.desi_id
-      LEFT JOIN Role_mast AS rm ON u.role_id = rm.Role_id
-      LEFT JOIN user_mast AS u2 ON u.user_report_to_id = u2.user_id
-      LEFT JOIN user_mast AS u3 ON u.Report_L1 = u3.user_id
-      LEFT JOIN user_mast AS u4 ON u.Report_L2 = u4.user_id
-      LEFT JOIN user_mast AS u5 ON u.Report_L3 = u5.user_id
-    WHERE
-      u.user_id = ?;`;
+//   const query = `
+//     SELECT
+//       u.*,
+//       d.dept_name AS department_name,
+//       sdm.sub_dept_name AS sub_dept_name,
+//       rm.Role_name AS Role_name,
+//       u2.user_name AS report,
 
-  // Send the query to the MySQL database with the user ID parameter and handle any errors or data retrieved
-  connection.query(query, [userId], (err, results) => {
-    if (err) {
-      console.error(err);
-      res.sendStatus(500); // Send HTTP status code 500 for server error
-      return;
-    }
+//       u3.user_name AS Report_L1N_name,
+//       u4.user_name AS Report_L2N_name,
+//       u5.user_name AS Report_L3N,
+//       dm.desi_name AS designation_name
+//     FROM
+//       user_mast AS u
+//       LEFT JOIN dept_mast AS d ON u.dept_id = d.dept_id
+//       LEFT JOIN sub_department AS sdm ON u.sub_dept_id = sdm.id
+//       LEFT JOIN Role_mast AS rm ON u.role_id = rm.Role_id
+//       LEFT JOIN user_mast AS u2 ON u.user_report_to_id = u2.user_id
+//       LEFT JOIN user_mast AS u3 ON u.Report_L1 = u3.user_id
+//       LEFT JOIN user_mast AS u4 ON u.Report_L2 = u4.user_id
+//       LEFT JOIN user_mast AS u5 ON u.Report_L3 = u5.user_id
+//       LEFT JOIN designation_mast AS dm ON u.user_designation = dm.desi_id
+//     WHERE
+//       u.user_id = ?;`;
 
-    if (results.length === 0) {
-      res.status(404).send("User not found");
-      return;
-    }
+//   // Send the query to the MySQL database with the user ID parameter and handle any errors or data retrieved
+//   connection.query(query, [userId], (err, results) => {
+//     if (err) {
+//       console.error(err);
+//       res.sendStatus(500); // Send HTTP status code 500 for server error
+//       return;
+//     }
 
-    // Process the data and add the image URLs to the response
-    const user = results[0];
-    const userImagesBaseUrl = "http://52.63.192.116:8000/user_images/";
-    const userDataWithImageUrls = {
-      ...user,
-      image_url: user.image ? userImagesBaseUrl + user.image : null,
-      uid_url: user.UID ? userImagesBaseUrl + user.UID : null,
-      pan_url: user.pan ? userImagesBaseUrl + user.pan : null,
-      highest_upload_url: user.highest_upload
-        ? userImagesBaseUrl + user.highest_upload
-        : null,
-      other_upload_url: user.other_upload
-        ? userImagesBaseUrl + user.other_upload
-        : null,
-    };
+//     if (results.length === 0) {
+//       res.status(404).send("User not found");
+//       return;
+//     }
 
-    res.send({ data: userDataWithImageUrls }); // Send the user data back to the client
-  });
-});
+//     // Process the data and add the image URLs to the response
+//     const user = results[0];
+//     const userImagesBaseUrl = "http://3.88.87.80:8000/user_images/";
+//     const userDataWithImageUrls = {
+//       ...user,
+//       image_url: user.image ? userImagesBaseUrl + user.image : null,
+//       uid_url: user.UID ? userImagesBaseUrl + user.UID : null,
+//       pan_url: user.pan ? userImagesBaseUrl + user.pan : null,
+//       highest_upload_url: user.highest_upload
+//         ? userImagesBaseUrl + user.highest_upload
+//         : null,
+//       other_upload_url: user.other_upload
+//         ? userImagesBaseUrl + user.other_upload
+//         : null,
+//     };
+
+//     res.send({ data: userDataWithImageUrls }); // Send the user data back to the client
+//   });
+// });
+// 31/8/23 file downloable url
+// app.get("/userdata", async (req, res) => {
+//   try {
+//     // Retrieve user data from the database
+//     const query = `
+//          SELECT
+//            u.*,
+//            d.dept_name AS department_name,
+//            sdm.sub_dept_name AS sub_dept_name,
+//            rm.Role_name AS Role_name,
+//            u2.user_name AS report,
+
+//           u3.user_name AS Report_L1N_name,
+//            u4.user_name AS Report_L2N_name,
+//            u5.user_name AS Report_L3N,
+//            dm.desi_name AS designation_name
+//          FROM
+//            user_mast AS u
+//            LEFT JOIN dept_mast AS d ON u.dept_id = d.dept_id
+//            LEFT JOIN sub_department AS sdm ON u.sub_dept_id = sdm.id
+//            LEFT JOIN Role_mast AS rm ON u.role_id = rm.Role_id
+//            LEFT JOIN user_mast AS u2 ON u.user_report_to_id = u2.user_id
+//            LEFT JOIN user_mast AS u3 ON u.Report_L1 = u3.user_id
+//            LEFT JOIN user_mast AS u4 ON u.Report_L2 = u4.user_id
+//            LEFT JOIN user_mast AS u5 ON u.Report_L3 = u5.user_id
+//            LEFT JOIN designation_mast AS dm ON u.user_designation = dm.desi_id
+//          WHERE
+//            u.user_id = 483;`;
+//     const [user] = await connection.promise().query(query);
+
+//     // Construct full image URL
+//     const imageUrl = `${req.protocol}://${req.get("host")}/user_images/${
+//       user.image
+//     }`;
+
+//     // Construct downloadable URL for the image
+//     const downloadUrl = `${req.protocol}://${req.get("host")}/user_images/${
+//       user.image
+//     }`;
+
+//     // Create an object for the user
+//     const userData = {
+//       user_id: user.user_id,
+//       user_name: user.user_name,
+//       // Other user data properties...
+
+//       user_image_url: imageUrl,
+//       user_image_download_url: downloadUrl,
+//     };
+
+//     // Send the user data as JSON response
+//     res.status(200).json(userData);
+//   } catch (error) {
+//     console.error("Error retrieving user from the database:", error);
+//     res.status(500).send("Error retrieving user from the database");
+//   }
+// });
+
+//28/08/2023 For upload images
 const upload3 = multer({ dest: "user_images/" }).fields([
   { name: "image", maxCount: 1 },
   { name: "UID", maxCount: 1 },
@@ -180,110 +243,205 @@ app.put("/userupdate", upload3, async (req, res) => {
       user_login_id,
       user_login_password,
       user_report_to_id,
-      dept_id,
       user_contact_no,
+      dept_id,
+      location_id,
+      created_by,
       role_id,
-      id,
       sitting_id,
       job_type,
-      PersonalNumber,
-      PersonalEmail,
+      personal_number,
       report_L1,
       report_L2,
       report_L3,
+      Personal_email,
       joining_date,
       releaving_date,
       level,
       room_id,
       salary,
+      SpokenLanguages,
+      Gender,
+      Nationality,
+      DOB,
+      Age,
+      FatherName,
+      MotherName,
+      Hobbies,
+      BloodGroup,
+      MartialStatus,
+      DateofMarriage,
+      tds_applicable,
+      tds_per,
+      onboard_status,
+      image_remark,
+      image_validate,
+      uid_remark,
+      uid_validate,
+      pan_remark,
+      pan_validate,
+      highest_upload_remark,
+      highest_upload_validate,
+      other_upload_remark,
+      other_upload_validate,
+      user_status,
+      lastupdated,
+      sub_dept_id,
+      id,
+      pan_no,
+      uid_no,
+      spouse_name,
+      highest_qualification_name,
     } = req.body;
 
-    console.log("product req.body", req.body);
+    const getUsersQuery = "SELECT * FROM user_mast WHERE user_id = ?";
+    connection.query(getUsersQuery, [req.body.id], (error, results, fields) => {
+      if (error) {
+        console.error("Error executing query:", error);
+        return;
+      }
+      console.log("results update user", results);
 
-    const updateObject = {
-      user_name: user_name || "",
-      user_designation: user_designation || "",
-      user_email_id: user_email_id || "",
-      user_login_id: user_login_id || "",
-      user_login_password: user_login_password || "",
-      user_contact_no: user_contact_no || "",
-      job_type: job_type || "",
-      PersonalNumber: PersonalNumber || "",
-      PersonalEmail: PersonalEmail || "",
-      level: level || "",
-      joining_date: joining_date || "",
-      releaving_date: releaving_date || "",
-      Sitting_id: sitting_id || 0,
-      Sitting_id: sitting_id || 0,
-      Sitting_id: sitting_id || 0,
-      user_report_to_id: user_report_to_id || 0,
-      last_updated: currentDate,
-      dept_id: dept_id || 0,
-      report_L1: report_L1 || 0,
-      report_L2: report_L2 || 0,
-      report_L3: report_L3 || 0,
-      joining_date: joining_date || null,
-      releaving_date: releaving_date || null,
-      salary: salary || 0,
-      role_id: role_id || 0,
-      room_id: room_id || 0,
-      level: level || "",
-      image: req.files.image ? req.files.image[0].filename : "",
-      UID: req.files.UID ? req.files.UID[0].filename : "",
-      pan: req.files.pan ? req.files.pan[0].filename : "",
-      highest_upload: req.files.highest_upload
-        ? req.files.highest_upload[0].filename
-        : "",
-      other_upload: req.files.other_upload
-        ? req.files.other_upload[0].filename
-        : "",
-    };
-    console.log("updateObject$$", updateObject);
-    const getUserQuery = "SELECT * FROM user_mast WHERE user_id = ?";
-    const [existingUser] = await connection.promise().query(getUserQuery, [id]);
+      const updateObject = {
+        userName: user_name || results[0].user_name,
+        userDesignation: user_designation || results[0].user_designation,
+        userEmailId: user_email_id || results[0].user_email_id,
+        userLoginId: user_login_id || results[0].user_login_id,
+        userLoginPassword:
+          user_login_password || results[0].user_login_password,
+        jobType: job_type || results[0].job_type,
+        personalNumber: personal_number || results[0].personal_number,
+        PersonalEmail: Personal_email || results[0].Personal_email,
+        reportL1: report_L1 ? parseInt(report_L1) : results[0].report_L1,
+        reportL2: report_L2 ? parseInt(report_L2) : results[0].report_L2,
+        reportL3: report_L3 ? parseInt(report_L3) : results[0].report_L3,
+        panNo: pan_no || results[0].pan_no,
+        uidNo: uid_no || results[0].uid_no,
+        sub_deptId: sub_dept_id
+          ? parseInt(sub_dept_id)
+          : results[0].sub_dept_id,
+        roomId: room_id ? parseInt(room_id) : results[0].room_id,
+        userReportToId: user_report_to_id
+          ? parseInt(user_report_to_id)
+          : results[0].user_report_to_id,
+        departmentId: dept_id ? parseInt(dept_id) : results[0].dept_id,
+        roleId: role_id ? parseInt(role_id) : results[0].role_id,
+        sittingId: sitting_id ? parseInt(sitting_id) : results[0].Sitting_id,
+        image: req.files.image ? req.files.image[0].filename : results[0].image,
+        createdAt: new Date(),
+        joingDate: joining_date || results[0].joining_date,
+        releavingDate: releaving_date || results[0].releavingDate,
+        Level: level || results[0].level,
+        userStatus: user_status || results[0].user_status,
+        UID: req.files.UID ? req.files.UID[0].filename : results[0].UID,
+        pan: req.files.pan ? req.files.pan[0].filename : results[0].pan,
+        highest_upload: req.files.highest_upload
+          ? req.files.highest_upload[0].filename
+          : results[0].highest_upload,
+        other_upload: req.files.other_upload
+          ? req.files.other_upload[0].filename
+          : results[0].other_upload,
+        salaryc: salary ? parseInt(salary) : results[0].salary,
+        Spokenlanguages: SpokenLanguages || results[0].SpokenLanguages,
+        Status: onboard_status || 3,
+        gender: Gender || results[0].Gender,
+        nationality: Nationality || results[0].Nationality,
+        age: Age || results[0].Age,
+        Fathername: FatherName || results[0].FatherName,
+        Mothername: MotherName || results[0].MotherName,
+        hobbies: Hobbies || results[0].Hobbies,
+        Bloodgroup: BloodGroup || results[0].BloodGroup,
+        Martialstatus: MartialStatus || results[0].MartialStatus,
+        DateOfMarriage: DateofMarriage || results[0].DateOfMarriage,
+        dob: DOB || results[0].DOB,
+        tdsApplicable: tds_applicable || results[0].tds_applicable,
+        tds_per: tds_per || results[0].tds_per,
+        imageRemark: image_remark || results[0].image_remark,
+        imageValidate: image_validate || results[0].image_validate,
+        uidRemark: uid_remark || results[0].uid_remark,
+        uidValidate: uid_validate || results[0].uid_validate,
+        panRemark: pan_remark || results[0].pan_remark,
+        panValidate: pan_validate || results[0].pan_validate,
+        highestUploadRemark:
+          highest_upload_remark || results[0].highest_upload_remark,
+        highestUploadValidate:
+          highest_upload_validate || results[0].highest_upload_validate,
+        otherUploadRremark:
+          other_upload_remark || results[0].other_upload_remark,
+        otherUploadValidate:
+          other_upload_validate || results[0].other_upload_validate,
+        highestQualificationName:
+          highest_qualification_name || results[0].highest_qualification_name,
+      };
 
-    if (!existingUser || !existingUser.length) {
-      return res.status(404).send("User not found");
-    }
+      const updateQuery =
+        "UPDATE user_mast SET user_name = ?, user_designation = ?, user_email_id = ?, user_login_id = ?, user_login_password = ?, job_type=?, PersonalNumber = ?, PersonalEmail=?, Report_L1 =?, Report_L2 =?, Report_L3 =?,pan_no=?,uid_no=?, sub_dept_id =?, room_id=?, user_report_to_id = ?, dept_id = ?, role_id = ?, Sitting_id = ?,image=?, created_At=?, joining_date=?, releaving_date=?, level=?, user_status=?, UID=?, pan=?,highest_upload=?,other_upload=?,salary=?,spokenLanguages=?,Gender=?,Nationality=?,Age=?,fatherName=?,motherName=?,Hobbies=?,BloodGroup=?, MartialStatus = ?, DateOfMarriage = ?, DOB = ?, tbs_applicable = ?, tds_per=?, image_remark=?, image_validate=?, uid_remark=?,uid_validate=?,pan_remark=?,pan_validate=?,highest_upload_remark=?,highest_upload_validate=?,other_upload_remark=?,other_upload_validate=?,highest_qualification_name=? WHERE user_id = ?";
 
-    const updateQuery =
-      "UPDATE user_mast SET user_name = ?,user_designation = ?,user_email_id = ?,user_login_id = ?,user_login_password = ?,user_contact_no = ?,user_report_to_id = ?,last_updated = ?,dept_id = ?,role_id = ?,room_id=?,Sitting_id = ?,image = ?,job_type=?,PersonalNumber=?,Report_L1 =?,Report_L2=?,Report_L3=?,PersonalEmail =?,level =?,joining_date =?,releaving_date =?,UID=?,pan=?,highest_upload=?,other_upload=?,salary=? WHERE user_id = ?";
+      const updateValues = [
+        updateObject.userName,
+        updateObject.userDesignation,
+        updateObject.userEmailId,
+        updateObject.userLoginId,
+        updateObject.userLoginPassword,
+        updateObject.jobType,
+        updateObject.personalNumber,
+        updateObject.PersonalEmail,
+        updateObject.reportL1,
+        updateObject.reportL2,
+        updateObject.reportL3,
+        updateObject.panNo,
+        updateObject.uidNo,
+        updateObject.sub_deptId,
+        updateObject.roomId,
+        updateObject.userReportToId,
+        updateObject.departmentId,
+        updateObject.roleId,
+        updateObject.sittingId,
+        updateObject.image,
+        updateObject.createdAt,
+        updateObject.joingDate,
+        updateObject.releavingDate,
+        updateObject.Level,
+        updateObject.userStatus,
+        updateObject.UID,
+        updateObject.pan,
+        updateObject.highest_upload,
+        updateObject.other_upload,
+        updateObject.salaryc,
+        updateObject.Spokenlanguages,
+        // updateObject.Status,
+        updateObject.gender,
+        updateObject.nationality,
+        updateObject.age,
+        updateObject.Fathername,
+        updateObject.Mothername,
+        updateObject.hobbies,
+        updateObject.Bloodgroup,
+        updateObject.Martialstatus,
+        updateObject.DateOfMarriage,
+        updateObject.dob,
+        updateObject.tdsApplicable,
+        updateObject.tds_per,
+        updateObject.imageRemark,
+        updateObject.imageValidate,
+        updateObject.uidRemark,
+        updateObject.uidValidate,
+        updateObject.panRemark,
+        updateObject.panValidate,
+        updateObject.highestUploadRemark,
+        updateObject.highestUploadValidate,
+        updateObject.otherUploadRremark,
+        updateObject.otherUploadValidate,
+        updateObject.highestQualificationName,
+        req.body.id,
+      ];
 
-    const updateValues = [
-      updateObject.user_name,
-      updateObject.user_designation,
-      updateObject.user_email_id,
-      updateObject.user_login_id,
-      updateObject.user_login_password,
-      updateObject.user_contact_no,
-      updateObject.user_report_to_id,
-      updateObject.last_updated,
-      updateObject.dept_id,
-      updateObject.role_id,
-      updateObject.room_id,
-      updateObject.Sitting_id,
-      updateObject.image, // Add the image field
-      updateObject.job_type,
-      updateObject.PersonalNumber,
-      updateObject.report_L1,
-      updateObject.report_L2,
-      updateObject.report_L3,
-      updateObject.PersonalEmail,
-      updateObject.level,
-      updateObject.joining_date,
-      updateObject.releaving_date,
-      updateObject.UID,
-      updateObject.pan,
-      updateObject.highest_upload,
-      updateObject.other_upload,
-      updateObject.salary,
-      id,
-    ];
+      connection.promise().query(updateQuery, updateValues);
+      console.log("update Query ", updateValues);
 
-    await connection.promise().query(updateQuery, updateValues);
-
-    console.log("User updated successfully");
-    res.status(200).send("User updated successfully");
+      console.log("User updated successfully");
+      res.status(200).send("User updated successfully");
+    });
   } catch (error) {
     console.error(error);
     res
@@ -291,27 +449,30 @@ app.put("/userupdate", upload3, async (req, res) => {
       .send("Error updating the user in the database: " + error.message);
   }
 });
+
 // 2/8/23 update only user image
 const upload11 = multer({ dest: "user_images/" });
-
 app.put("/userimageupdate", upload11.single("image"), async (req, res) => {
-  console.log("PUT /userupdate API hit");
-  const currentDate = new Date();
+  console.log("PUT /userimageupdate API hit");
 
   try {
     // Extract data from the request body
     const { id } = req.body;
 
-    const updateObject = {
-      image: req.file ? req.file.filename : "",
-    };
-    console.log("updateObject$$", updateObject);
     const getUserQuery = "SELECT * FROM user_mast WHERE user_id = ?";
     const [existingUser] = await connection.promise().query(getUserQuery, [id]);
 
     if (!existingUser || !existingUser.length) {
       return res.status(404).send("User not found");
     }
+
+    // Create an updateObject with the existing data
+    const updateObject = {
+      ...existingUser[0], // Spread existing data
+      image: req.file ? req.file.filename : existingUser[0].image, // Update the image field if a new file is uploaded, otherwise use existing value
+    };
+
+    console.log("updateObject", updateObject);
 
     const updateQuery = "UPDATE user_mast SET ? WHERE user_id = ?";
 
@@ -484,6 +645,7 @@ app.post("/login", async (req, res) => {
         Sitting_id: rows[0].Sitting_id,
         Sitting_ref_no: rows[0].Sitting_ref_no,
         onboard_status: rows[0].onboard_status,
+        user_status: rows[0].user_status,
       },
       secretKey,
       { expiresIn: "1h" }
@@ -500,7 +662,8 @@ app.post("/login", async (req, res) => {
         role_id: rows[0].role_id,
         sitting_id: rows[0].sitting_id,
         room_id: rows[0].room_id,
-        // Add the following two lines to include Sitting_id and Sitting_ref_no in the response
+        user_status: rows[0].user_status,
+
         Sitting_id: rows[0].Sitting_id,
         Sitting_ref_no: rows[0].Sitting_ref_no,
         onboard_status: rows[0].onboard_status,
@@ -530,6 +693,27 @@ app.post("/deliveryboy", (req, res) => {
     res.send({ results }); // Send the data back to the client
   });
 });
+app.get("/deliveryboy/:room_id", (req, res) => {
+  const id = 3;
+  const room_id = req.params.room_id;
+
+  console.log("room_id === ", room_id);
+  console.log("role_id === ", id);
+
+  const query = `SELECT *  FROM user_mast WHERE role_id = ? AND room_id = ?`;
+  console.log("query====", query);
+
+  connection.query(query, [id, room_id], (err, results) => {
+    if (err) {
+      console.error(err);
+      res.sendStatus(500); // Send HTTP status code 500 for server error
+      return;
+    }
+    console.log("results", results);
+    res.send({ results }); // Send the data back to the client
+  });
+});
+
 app.post("/userpresitting", async (req, res) => {
   console.log("POST /userpresitting API hit");
   try {
@@ -1094,7 +1278,7 @@ const fs = require("fs");
 app.post("/mail2", upload5.single("attachment"), async (req, res) => {
   console.log("mail api hit");
   try {
-    const { email, subject, name, password, login_id, status } = req.body;
+    const { email, subject, name, password, login_id, status, text } = req.body;
     const attachment = req.file;
     if (status == "onboarded") {
       // Read the email template file
@@ -1102,7 +1286,13 @@ app.post("/mail2", upload5.single("attachment"), async (req, res) => {
       const template = await fs.promises.readFile(templatePath, "utf-8");
 
       // Render the email template with dynamic values
-      const html = ejs.render(template, { email, password, name, login_id });
+      const html = ejs.render(template, {
+        email,
+        password,
+        name,
+        login_id,
+        text,
+      });
 
       let mailTransporter = nodemailer.createTransport({
         service: "gmail",
@@ -1135,7 +1325,13 @@ app.post("/mail2", upload5.single("attachment"), async (req, res) => {
       const template = await fs.promises.readFile(templatePath, "utf-8");
 
       // Render the email template with dynamic values
-      const html = ejs.render(template, { email, password, name, login_id });
+      const html = ejs.render(template, {
+        email,
+        password,
+        name,
+        login_id,
+        text,
+      });
 
       let mailTransporter = nodemailer.createTransport({
         service: "gmail",
@@ -1315,15 +1511,27 @@ app.post("/userspostnew", upload9, async (req, res) => {
       highest_upload_validate,
       other_upload_remark,
       other_upload_validate,
+      user_status,
+      lastupdated,
+      sub_dept_id,
+      pan_no,
+      uid_no,
+      spouse_name,
+      highest_qualification_name,
     } = req.body;
 
+    const userName = user_name || "";
     const userDesignation = user_designation || "";
+    const userEmailId = user_email_id || "";
+    const userLoginId = user_login_id || "";
+    const userLoginPassword = user_login_password || "";
     const jobType = job_type || "";
     const personalNumber = personal_number || "";
     const PersonalEmail = Personal_email || "";
     const reportL1 = report_L1 ? parseInt(report_L1) : 0;
     const reportL2 = report_L2 ? parseInt(report_L2) : 0;
     const reportL3 = report_L3 ? parseInt(report_L3) : 0;
+    const sub_deptId = sub_dept_id ? parseInt(sub_dept_id) : 0;
     const roomId = room_id ? parseInt(room_id) : 0;
     const userReportToId = user_report_to_id ? parseInt(user_report_to_id) : 0;
     const departmentId = dept_id ? parseInt(dept_id) : 0;
@@ -1334,6 +1542,7 @@ app.post("/userspostnew", upload9, async (req, res) => {
     const joingDate = joining_date || null;
     const releavingDate = releaving_date || null;
     const Level = level || "";
+    const userStatus = user_status || "";
     const UID = req.files.UID ? req.files.UID[0].filename : null;
     const pan = req.files.pan ? req.files.pan[0].filename : null;
     const highest_upload = req.files.highest_upload
@@ -1367,106 +1576,118 @@ app.post("/userspostnew", upload9, async (req, res) => {
     const highestUploadValidate = highest_upload_validate || "";
     const otherUploadRremark = other_upload_remark || "";
     const otherUploadValidate = other_upload_validate || "";
+    const panNo = pan_no || "";
+    const uidNo = uid_no || "";
+    const spouseName = spouse_name || "";
+    const highestQualificationName = highest_qualification_name || "";
 
-    // Insert the new user into the user_mast table
-    // ...
     const insertUserQuery = `
-  INSERT INTO user_mast (
-    user_name,
-    user_designation,
-    user_email_id,
-    user_login_id,
-    user_login_password,
-    user_report_to_id,
-    user_contact_no,
-    dept_id,
-    location_id,
-    created_by,
-    role_id,
-    sitting_id,
-    created_at,
-    job_type,
-    PersonalNumber,
-    Report_L1,
-    Report_L2,
-    Report_L3,
-    PersonalEmail,
-    joining_date,
-    releaving_date,
-    level,
-    room_id,
-    image,
-    UID,
-    pan,
-    highest_upload,
-    other_upload,
-    salary,
-    onboard_status,
-    SpokenLanguages,
-    Gender,
-    Nationality,
-    DOB,
-    Age,
-    fatherName,
-    motherName,
-    BloodGroup,
-    MartialStatus,
-    DateOfMarriage,
-    tbs_applicable,
-    tds_per,
-    image_remark,
-    uid_validate,
-    pan_remark,
-    pan_validate,
-    highest_upload_remark,
-    highest_upload_validate,
-    other_upload_remark,
-    other_upload_validate
-  )
-  VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-`;
+    INSERT INTO user_mast (
+      user_name,
+      user_designation,
+      user_email_id,
+      user_login_id,
+      user_login_password,
+      user_report_to_id,
+      created_at,
+      last_updated,
+      created_by,
+      user_contact_no,
+      dept_id,
+      location_id,
+      role_id,
+      sitting_id,
+      image,
+      job_type,
+      PersonalNumber,
+      Report_L1,
+      Report_L2,
+      Report_L3,
+      PersonalEmail,
+      level,
+      joining_date,
+      releaving_date,
+      room_id,
+      UID,
+      pan,
+      highest_upload,
+      other_upload,
+      salary,
+      SpokenLanguages,
+      Gender,
+      Nationality,
+      DOB,
+      Age,
+      fatherName,
+      motherName,
+      Hobbies,
+      BloodGroup,
+      MartialStatus,
+      DateOfMarriage,
+      onboard_status,
+      tbs_applicable,
+      tds_per,
+      image_remark,
+      image_validate,
+      uid_remark,
+      uid_validate,
+      pan_remark,
+      pan_validate,
+      highest_upload_remark,
+      highest_upload_validate,
+      other_upload_remark,
+      other_upload_validate,
+      user_status,
+      sub_dept_id,
+      pan_no,
+      uid_no,
+      spouse_name,
+      highest_qualification_name
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);`;
 
     const userValues = [
-      user_name || "",
+      userName || "",
       userDesignation,
-      user_email_id || "",
-      user_login_id || "",
-      user_login_password || "",
+      userEmailId || "",
+      userLoginId || "",
+      userLoginPassword || "",
       userReportToId,
+      createdAt,
+      lastupdated || null,
+      created_by || 0,
       user_contact_no || "",
       departmentId,
       location_id || 0,
-      created_by || 0,
       roleId || 0,
       sittingId || 0,
-      createdAt,
+      image,
       jobType || "",
       personalNumber || "",
       reportL1 || 0,
       reportL2 || 0,
       reportL3 || 0,
       PersonalEmail || "",
+      Level || "",
       joingDate || null,
       releavingDate || null,
-      Level || "",
       roomId || 0,
-      image,
       UID,
       pan,
       highest_upload,
       other_upload,
       salaryc || 0,
-      Status || "",
       Spokenlanguages || "",
-      gender || "",
+      Gender || "",
       nationality || "",
       dob || "",
       age || "",
       Fathername || "",
       Mothername || "",
+      Hobbies || "",
       Bloodgroup || "",
       Martialstatus || "",
       DateOfMarriage || "",
+      Status || "",
       tdsApplicable || "",
       tdsPer || 0,
       imageRemark || "",
@@ -1479,6 +1700,12 @@ app.post("/userspostnew", upload9, async (req, res) => {
       highestUploadValidate || "",
       otherUploadRremark || "",
       otherUploadValidate || "",
+      userStatus || "",
+      sub_deptId || 0,
+      panNo || "",
+      uidNo || "",
+      spouseName || "",
+      highestQualificationName || "",
     ];
 
     // Execute the insert query for the user
@@ -1553,6 +1780,7 @@ app.post("/userspostnew", upload9, async (req, res) => {
     res.status(500).send("Error adding user to database: " + error.message);
   }
 });
+
 app.get("/getuserdeptwisewfhdata/:id", (req, res) => {
   const dept_id = req.params.id; // Get the lead_mast ID from the request parameters
 
@@ -1586,6 +1814,7 @@ app.get("/allusersnew", (req, res) => {
     SELECT 
     u.*, 
     d.dept_name AS department_name, 
+    sd.sub_dept_name  AS sub_department_name, 
     rm.Role_name AS Role_name, 
     u2.user_name AS report,
     u3.user_name AS Report_L1N,
@@ -1595,6 +1824,7 @@ app.get("/allusersnew", (req, res) => {
   FROM 
     user_mast AS u
     LEFT JOIN dept_mast AS d ON u.dept_id = d.dept_id
+    LEFT JOIN sub_department AS sd ON sd.id = u.sub_dept_id
     LEFT JOIN designation_mast AS dm ON u.user_designation = dm.desi_id
     LEFT JOIN Role_mast AS rm ON u.role_id = rm.Role_id
     LEFT JOIN user_mast AS u2 ON u.user_report_to_id = u2.user_id
@@ -1633,19 +1863,28 @@ app.get("/usernew/:userId", (req, res) => {
   const userId = req.params.userId; // Get the user ID from the URL parameter
   console.log(`Retrieving user data for user ID: ${userId}`);
 
+  const userImagesBaseUrl = "http://3.88.87.80:8000/user_images/"; // Define the base URL for user images
+
   const query = `
-    SELECT 
-      u.*, 
-      d.dept_name AS department_name, 
-      rm.Role_name AS Role_name, 
+    SELECT
+      u.*,
+      d.dept_name AS department_name,
+     
+      s.Sitting_area   AS Sitting_area_N,
+      r.Sitting_ref_no    AS r_Sitting_ref_no ,
+      sdm.sub_dept_name  AS sub_dept_name,
+      rm.Role_name AS Role_name,
       u2.user_name AS report,
       u3.user_name AS Report_L1N,
       u4.user_name AS Report_L2N,
       u5.user_name AS Report_L3N,
       dm.desi_name AS designation_name
-    FROM 
+    FROM
       user_mast AS u
       LEFT JOIN dept_mast AS d ON u.dept_id = d.dept_id
+      LEFT JOIN Sitting_mast AS s ON s.Sitting_id  = u.sitting_id
+      LEFT JOIN room_mast AS r ON r.room_id   = u.room_id  
+      LEFT JOIN sub_department AS sdm ON u.sub_dept_id = sdm.id
       LEFT JOIN designation_mast AS dm ON u.user_designation = dm.desi_id
       LEFT JOIN Role_mast AS rm ON u.role_id = rm.Role_id
       LEFT JOIN user_mast AS u2 ON u.user_report_to_id = u2.user_id
@@ -1686,12 +1925,275 @@ app.get("/usernew/:userId", (req, res) => {
     res.send(userDataWithImageUrls); // Send the user data back to the client
   });
 });
-app.put("/userupdatenew", upload3, async (req, res) => {
+
+// 31/8/23 file downloable url
+// app.get("/usernew/:userId", (req, res) => {
+//   const userId = req.params.userId; // Get the user ID from the URL parameter
+//   console.log(`Retrieving user data for user ID: ${userId}`);
+
+//   const query = `
+//     SELECT
+//       u.*,
+//       d.dept_name AS department_name,
+//       rm.Role_name AS Role_name,
+//       u2.user_name AS report,
+//       u3.user_name AS Report_L1N,
+//       u4.user_name AS Report_L2N,
+//       u5.user_name AS Report_L3N,
+//       dm.desi_name AS designation_name
+//     FROM
+//       user_mast AS u
+//       LEFT JOIN dept_mast AS d ON u.dept_id = d.dept_id
+//       LEFT JOIN designation_mast AS dm ON u.user_designation = dm.desi_id
+//       LEFT JOIN Role_mast AS rm ON u.role_id = rm.Role_id
+//       LEFT JOIN user_mast AS u2 ON u.user_report_to_id = u2.user_id
+//       LEFT JOIN user_mast AS u3 ON u.Report_L1 = u3.user_id
+//       LEFT JOIN user_mast AS u4 ON u.Report_L2 = u4.user_id
+//       LEFT JOIN user_mast AS u5 ON u.Report_L3 = u5.user_id
+//     WHERE
+//       u.user_id = ?;`;
+
+//   // Send the query to the MySQL database with the user ID parameter and handle any errors or data retrieved
+//   connection.query(query, [userId], (err, results) => {
+//     if (err) {
+//       console.error(err);
+//       res.sendStatus(500); // Send HTTP status code 500 for server error
+//       return;
+//     }
+
+//     if (results.length === 0) {
+//       res.status(404).send("User not found");
+//       return;
+//     }
+
+//     // Process the data and generate URLs for file attachments
+//     const user = results[0];
+//     const userImagesBaseUrl = "http://3.88.87.80:8000/user_images/";
+//     const userDataWithDownloadableUrls = {
+//       ...user,
+//       image_url: user.image ? userImagesBaseUrl + user.image : null,
+//       uid_url: user.UID ? userImagesBaseUrl + user.UID : null,
+//       pan_url: user.pan ? userImagesBaseUrl + user.pan : null,
+//       highest_upload_url: user.highest_upload
+//         ? userImagesBaseUrl + user.highest_upload
+//         : null,
+//       other_upload_url: user.other_upload
+//         ? userImagesBaseUrl + user.other_upload
+//         : null,
+//     };
+
+//     // Render a view with the user data and clickable/downloadable URLs
+//     res.render("userProfile", { userData: userDataWithDownloadableUrls });
+//   });
+// });
+// 31/8/23 check code
+// app.get("/usernew/:userId", (req, res) => {
+//   const userId = req.params.userId; // Get the user ID from the URL parameter
+//   console.log(`Retrieving user data for user ID: ${userId}`);
+
+//   const query = `
+//        SELECT
+//          u.*,
+//          d.dept_name AS department_name,
+//          rm.Role_name AS Role_name,
+//          u2.user_name AS report,
+//          u3.user_name AS Report_L1N,
+//          u4.user_name AS Report_L2N,
+//          u5.user_name AS Report_L3N,
+//          dm.desi_name AS designation_name
+//        FROM
+//          user_mast AS u
+//          LEFT JOIN dept_mast AS d ON u.dept_id = d.dept_id
+//          LEFT JOIN designation_mast AS dm ON u.user_designation = dm.desi_id
+//          LEFT JOIN Role_mast AS rm ON u.role_id = rm.Role_id
+//          LEFT JOIN user_mast AS u2 ON u.user_report_to_id = u2.user_id
+//          LEFT JOIN user_mast AS u3 ON u.Report_L1 = u3.user_id
+//          LEFT JOIN user_mast AS u4 ON u.Report_L2 = u4.user_id
+//          LEFT JOIN user_mast AS u5 ON u.Report_L3 = u5.user_id
+//        WHERE
+//          u.user_id = ?;`;
+
+//   // Send the query to the MySQL database with the user ID parameter and handle any errors or data retrieved
+//   connection.query(query, [userId], (err, results) => {
+//     if (err) {
+//       console.error(err);
+//       res.sendStatus(500); // Send HTTP status code 500 for server error
+//       return;
+//     }
+
+//     if (results.length === 0) {
+//       res.status(404).send("User not found");
+//       return;
+//     }
+
+//     // Process the data and generate URLs for file attachments
+//     const user = results[0];
+//     const userImagesBaseUrl = "http://3.88.87.80:8000/user_images/";
+//     const userDataWithDownloadableUrls = {
+//       ...user,
+//       image_url: user.image ? userImagesBaseUrl + user.image : null,
+//       uid_url: user.UID ? userImagesBaseUrl + user.UID : null,
+//       pan_url: user.pan ? userImagesBaseUrl + user.pan : null,
+//       highest_upload_url: user.highest_upload
+//         ? userImagesBaseUrl + user.highest_upload
+//         : null,
+//       other_upload_url: user.other_upload
+//         ? userImagesBaseUrl + user.other_upload
+//         : null,
+//     };
+
+//     // Render a view with the user data and clickable/downloadable URLs
+//     res.render("userProfile", { userData: userDataWithDownloadableUrls });
+//   });
+// });
+// check code
+// app.get("/usernew/:user_id", async (req, res) => {
+//   try {
+//     // Retrieve products from the database
+//     const query = `
+//             SELECT
+//               u.*,
+//               d.dept_name AS department_name,
+//               rm.Role_name AS Role_name,
+//               u2.user_name AS report,
+//               u3.user_name AS Report_L1N,
+//               u4.user_name AS Report_L2N,
+//               u5.user_name AS Report_L3N,
+//               dm.desi_name AS designation_name
+//             FROM
+//               user_mast AS u
+//               LEFT JOIN dept_mast AS d ON u.dept_id = d.dept_id
+//               LEFT JOIN designation_mast AS dm ON u.user_designation = dm.desi_id
+//               LEFT JOIN Role_mast AS rm ON u.role_id = rm.Role_id
+//               LEFT JOIN user_mast AS u2 ON u.user_report_to_id = u2.user_id
+//               LEFT JOIN user_mast AS u3 ON u.Report_L1 = u3.user_id
+//               LEFT JOIN user_mast AS u4 ON u.Report_L2 = u4.user_id
+//               LEFT JOIN user_mast AS u5 ON u.Report_L3 = u5.user_id
+//             WHERE
+//               u.user_id = 500;`;
+//     const [users] = await connection.promise().query(query);
+
+//     // Create an array to store the product data
+//     const userData = [];
+
+//     products.forEach((user) => {
+//       // Construct full image URL
+//       const imageUrl = `${req.protocol}://${req.get("host")}/user_images/${
+//         user.image
+//       }`;
+
+//       // Construct downloadable URL for the image
+//       const downloadUrl = `${req.protocol}://${req.get("host")}/user_images/${
+//         user.image
+//       }`;
+
+//       // Create an object for each product
+//       const userObj = {
+//         Product_id: user.Product_id,
+//         Product_name: user.Product_name,
+//         Product_type: user.Product_type,
+//         Duration: user.Duration,
+//         Stock_qty: user.Stock_qty,
+//         Unit: user.Unit,
+//         Opening_stock: user.Opening_stock,
+//         Opening_stock_date: user.Opening_stock_date,
+//         Remarks: user.Remarks,
+//         Creation_date: user.creation_date,
+//         Created_by: user.Created_by,
+//         Last_updated_by: user.Last_updated_by,
+//         Last_updated_date: user.Last_updated_date,
+//         props1: user.props1,
+//         props2: user.props2,
+//         props3: user.props3,
+//         user_image_url: imageUrl,
+//         user_image_download_url: downloadUrl,
+//       };
+
+//       productData.push(productObj);
+//     });
+
+//     // Send the product data as JSON response
+//     res.status(200).json(productData);
+//   } catch (error) {
+//     console.error("Error retrieving products from the database:", error);
+//     res.status(500).send("Error retrieving products from the database");
+//   }
+// });
+
+const upload19 = multer().fields([
+  { name: "image", maxCount: 1 },
+  { name: "UID", maxCount: 1 },
+  { name: "pan", maxCount: 1 },
+  { name: "highest_upload", maxCount: 1 },
+  { name: "other_upload", maxCount: 1 },
+]);
+
+app.put("/userupdatenew/:id", upload19, async (req, res) => {
   console.log("PUT /userupdatenew API hit");
   const currentDate = new Date();
-
+  const id = req.params.id;
   try {
-    const { id, ...updateFields } = req.body; // Extract user ID and other update fields
+    const {
+      user_name,
+      user_designation,
+      user_email_id,
+      user_login_id,
+      user_login_password,
+      user_report_to_id,
+      user_contact_no,
+      dept_id,
+      location_id,
+      created_by,
+      role_id,
+      sitting_id,
+      image,
+      UID,
+      pan,
+      highest_upload,
+      other_upload,
+      job_type,
+      personal_number,
+      report_L1,
+      report_L2,
+      report_L3,
+      Personal_email,
+      joining_date,
+      releaving_date,
+      level,
+      room_id,
+      salary,
+      SpokenLanguages,
+      Gender,
+      Nationality,
+      DOB,
+      Age,
+
+      FatherName,
+      MotherName,
+      Hobbies,
+      BloodGroup,
+      MartialStatus,
+      DateofMarriage,
+      tds_applicable,
+      tds_per,
+      onboard_status,
+      image_remark,
+      image_validate,
+      uid_remark,
+      uid_validate,
+      pan_remark,
+      pan_validate,
+      highest_upload_remark,
+      highest_upload_validate,
+      other_upload_remark,
+      other_upload_validate,
+      user_status,
+      sub_dept_id,
+      createdAt,
+      pan_no,
+      uid_no,
+      spouse_name,
+    } = req.body;
 
     console.log("user req.body", req.body);
 
@@ -1703,48 +2205,151 @@ app.put("/userupdatenew", upload3, async (req, res) => {
     }
 
     // Construct the update query dynamically
-    const updateQuery = "UPDATE user_mast SET ? WHERE user_id = ?";
+    const updateQuery = `
+    UPDATE user_mast
+SET
+  user_name = ?,
+  user_designation = ?,
+  user_email_id = ?,
+  user_login_id = ?,
+  user_login_password = ?,
+  user_report_to_id = ?,
+  created_at = ?,                -- Placeholder 7
+  last_updated = ?,              -- Placeholder 8
+  created_by = ?,                -- Placeholder 9
+  user_contact_no = ?,           -- Placeholder 10
+  dept_id = ?,                   -- Placeholder 11
+  location_id = ?,               -- Placeholder 12
+  role_id = ?,                   -- Placeholder 13
+  sitting_id = ?,                -- Placeholder 14
+  image = ?,                     -- Placeholder 15
+  job_type = ?,                  -- Placeholder 16
+  PersonalNumber = ?,            -- Placeholder 17
+  Report_L1 = ?,                 -- Placeholder 18
+  Report_L2 = ?,                 -- Placeholder 19
+  Report_L3 = ?,                 -- Placeholder 20
+  PersonalEmail = ?,             -- Placeholder 21
+  joining_date = ?,              -- Placeholder 22
+  releaving_date = ?,            -- Placeholder 23
+  level = ?,                     -- Placeholder 24
+  room_id = ?,                   -- Placeholder 25
+  UID = ?,                       -- Placeholder 26
+  pan = ?,                       -- Placeholder 27
+  highest_upload = ?,            -- Placeholder 28
+  other_upload = ?,              -- Placeholder 29
+  salary = ?,                    -- Placeholder 30
+  SpokenLanguages = ?,           -- Placeholder 31
+  Gender = ?,                    -- Placeholder 32
+  Nationality = ?,               -- Placeholder 33
+  DOB = ?,                       -- Placeholder 34
+  Age = ?,                       -- Placeholder 35
+  fatherName = ?,                -- Placeholder 36
+  motherName = ?,                -- Placeholder 37
+  Hobbies = ?,                   -- Placeholder 38
+  BloodGroup = ?,                -- Placeholder 39
+  MartialStatus = ?,             -- Placeholder 40
+  DateOfMarriage = ?,            -- Placeholder 41
+  onboard_status = ?,            -- Placeholder 42
+  tbs_applicable = ?,            -- Placeholder 43
+  tds_per = ?,                   -- Placeholder 44
+  image_remark = ?,              -- Placeholder 45
+  image_validate = ?, 
+             -- Placeholder 46
+  uid_remark = ?,                -- Placeholder 47
 
-    // Construct the update object dynamically with non-null fields
-    const updateObject = {};
-    for (const field in updateFields) {
-      if (updateFields[field] !== null && updateFields[field] !== undefined) {
-        updateObject[field] = updateFields[field];
-      }
-    }
+  sub_dept_id=?,
+  uid_validate = ?,              -- Placeholder 48
+  pan_remark = ?,                -- Placeholder 49
+  pan_validate = ?,              -- Placeholder 50
+  highest_upload_remark = ?,     -- Placeholder 51
+  highest_upload_validate = ?,   -- Placeholder 52
+  other_upload_remark = ?,       -- Placeholder 53
+  other_upload_validate = ?,     -- Placeholder 54
+  user_status = ?,               -- Placeholder 55
+  last_updated = ?,               -- Placeholder 56
+  pan_no =?,
+  uid_no =?,
+  spouse_name =?
+  WHERE user_id = ?                -- Placeholder 57
+`;
 
-    // If images are provided, update the image fields
-    if (req.files.image) {
-      updateObject.image = req.files.image[0].filename;
-    }
-    if (req.files.UID) {
-      updateObject.UID = req.files.UID[0].filename;
-    }
-    if (req.files.pan) {
-      updateObject.pan = req.files.pan[0].filename;
-    }
-    if (req.files.highest_upload) {
-      updateObject.highest_upload = req.files.highest_upload[0].filename;
-    }
-    if (req.files.other_upload) {
-      updateObject.other_upload = req.files.other_upload[0].filename;
-    }
+    const updateValues = [
+      user_name || "",
+      user_designation || "",
+      user_email_id || "",
+      user_login_id || "",
+      user_login_password || "",
+      user_report_to_id || 0,
+      createdAt || null, // Placeholder 7
+      currentDate || "", // Placeholder 8
+      created_by || 0, // Placeholder 9
+      user_contact_no || "", // Placeholder 10
+      dept_id || 0, // Placeholder 11
+      location_id || 0, // Placeholder 12
+      role_id || 0, // Placeholder 13
+      sitting_id || 0, // Placeholder 14
+      image || null, // Placeholder 15
+      job_type || "", // Placeholder 16
+      personal_number || "", // Placeholder 17
+      report_L1 || 0, // Placeholder 18
+      report_L2 || 0, // Placeholder 19
+      report_L3 || 0, // Placeholder 20
+      Personal_email || "", // Placeholder 21
+      joining_date || null, // Placeholder 22
+      releaving_date || null, // Placeholder 23
+      level || "", // Placeholder 24
+      room_id || 0, // Placeholder 25
+      UID || "", // Placeholder 26
+      pan || "", // Placeholder 27
+      highest_upload || "", // Placeholder 28
+      other_upload || "", // Placeholder 29
+      salary || 0, // Placeholder 30
+      SpokenLanguages || "", // Placeholder 31
+      Gender || "", // Placeholder 32
+      Nationality || "", // Placeholder 33
+      DOB || "", // Placeholder 34
+      Age || "", // Placeholder 35
+      FatherName || "", // Placeholder 36
+      MotherName || "", // Placeholder 37
+      Hobbies || "", // Placeholder 38
+      BloodGroup || "", // Placeholder 39
+      MartialStatus || "", // Placeholder 40
+      DateofMarriage || "", // Placeholder 41
+      onboard_status || 0, // Placeholder 42
+      tds_applicable || "", // Placeholder 43
+      tds_per || 0, // Placeholder 44
+      image_remark | "", // Placeholder 45
+      image_validate || "", // Placeholder 46
+      uid_remark || "", // Placeholder 47
+      sub_dept_id,
+      uid_validate || "", // Placeholder 48
+      pan_remark || "", // Placeholder 49
+      pan_validate || "", // Placeholder 50
+      highest_upload_remark || "", // Placeholder 51
+      highest_upload_validate || "", // Placeholder 52
+      other_upload_remark || "", // Placeholder 53
+      other_upload_validate || "", // Placeholder 54
+      user_status || "", // Placeholder 55
+      currentDate || "", // Placeholder 56
+      pan_no || "",
+      uid_no || "",
+      spouse_name || "",
+      id, // Placeholder 57
+    ];
 
-    // Add last_updated field
-    updateObject.last_updated = currentDate;
-
-    // Execute the update query with the updateObject and user_id
-    await connection.promise().query(updateQuery, [updateObject, id]);
+    // Execute the update query with the updateValues
+    await connection.promise().query(updateQuery, updateValues);
 
     console.log("User updated successfully");
     res.status(200).send("User updated successfully");
   } catch (error) {
-    console.error(error);
+    console.error("Error##" + error.message);
     res
       .status(500)
       .send("Error updating the user in the database: " + error.message);
   }
 });
+
 // get user by status of dept wise user 4/8/23 5:12
 app.get("/allusertdatabysdept", (req, res) => {
   // Get the onboard_status and dept_id from the request query parameters
@@ -1848,6 +2453,58 @@ app.get("/getuserdeptwise/:id", (req, res) => {
 // const multer = require("multer");
 const upload10 = multer({ dest: "user_images/" });
 
+// app.post(
+//   "/userotherfieldpostnew",
+//   upload10.single("field_value"),
+//   async (req, res) => {
+//     console.log("post userotherfieldpost API hit");
+//     try {
+//       // Extract data from the request body
+//       const { user_id, field_name, created_by, remark } = req.body;
+
+//       const UserId = user_id || 0;
+//       const fieldName = field_name || "";
+//       const createdBy = created_by || 0;
+//       const fieldValue = req.file ? req.file.filename : ""; // Use req.file.filename to get the uploaded file name
+//       const createdAt = new Date();
+//       const Remark = remark || "";
+//       console.log("fieldValue", fieldValue);
+//       // Insert the new user field into the user_other_field_mast table
+//       const insertFieldQuery = `
+//       INSERT INTO user_other_field_mast (
+//         user_id,
+//         field_name,
+//         field_value,
+//         created_at,
+//         created_by,
+//         remark
+//       )
+//       VALUES (?,?,?,?,?,?)
+//     `;
+
+//       const fieldValues = [
+//         UserId || 0,
+//         fieldName,
+//         fieldValue,
+//         createdAt,
+//         createdBy,
+//         Remark,
+//       ];
+
+//       // Execute the insert query for the user field
+//       await connection.promise().query(insertFieldQuery, fieldValues);
+
+//       console.log("User other field added successfully");
+//       res.status(200).send("User other field added successfully");
+//     } catch (error) {
+//       console.error(error);
+//       res
+//         .status(500)
+//         .send("Error adding user other field to database: " + error.message);
+//     }
+//   }
+// );
+//29/8/23 check other field api
 app.post(
   "/userotherfieldpostnew",
   upload10.single("field_value"),
@@ -1855,15 +2512,14 @@ app.post(
     console.log("post userotherfieldpost API hit");
     try {
       // Extract data from the request body
-      const { user_id, field_name, created_by, remark } = req.body;
+      const { field_name, created_by, remark } = req.body;
 
-      const UserId = user_id || 0;
       const fieldName = field_name || "";
       const createdBy = created_by || 0;
       const fieldValue = req.file ? req.file.filename : ""; // Use req.file.filename to get the uploaded file name
       const createdAt = new Date();
       const Remark = remark || "";
-      console.log("fieldValue", fieldValue);
+
       // Insert the new user field into the user_other_field_mast table
       const insertFieldQuery = `
       INSERT INTO user_other_field_mast (
@@ -1878,7 +2534,7 @@ app.post(
     `;
 
       const fieldValues = [
-        UserId || 0,
+        0, // Temporary user_id value
         fieldName,
         fieldValue,
         createdAt,
@@ -1890,6 +2546,25 @@ app.post(
       await connection.promise().query(insertFieldQuery, fieldValues);
 
       console.log("User other field added successfully");
+
+      // Get the ID of the last inserted row in user_mast
+      const lastUserQuery =
+        "SELECT user_id FROM user_mast ORDER BY user_id DESC LIMIT 1";
+      const [lastUserResult] = await connection.promise().query(lastUserQuery);
+      const lastUserId = lastUserResult[0].user_id;
+      console.log("lastUserId", lastUserId);
+
+      // Update the user_id in the user_other_field_mast table
+      const updateUserFieldQuery = `
+      UPDATE user_other_field_mast
+      SET user_id = ?
+      WHERE id = LAST_INSERT_ID()
+    `;
+
+      await connection.promise().query(updateUserFieldQuery, [lastUserId]);
+
+      console.log("User ID in user_other_field_mast updated successfully");
+
       res.status(200).send("User other field added successfully");
     } catch (error) {
       console.error(error);
@@ -1899,8 +2574,11 @@ app.post(
     }
   }
 );
-app.get("/allusersotherfielddata", (req, res) => {
-  console.log("Retrieving all users with other field data");
+
+app.get("/allusersotherfielddata/:user_id", (req, res) => {
+  console.log("Retrieving user's other field data");
+
+  const userId = req.params.user_id;
 
   const query = `
     SELECT 
@@ -1911,10 +2589,11 @@ app.get("/allusersotherfielddata", (req, res) => {
       user_other_field_mast AS u
     LEFT JOIN user_mast AS u4 ON u.user_id = u4.user_id
     LEFT JOIN user_mast AS u5 ON u.created_by = u5.user_id
+    WHERE u.user_id = ?
   `;
 
   // Send the query to the MySQL database and handle any errors or data retrieved
-  connection.query(query, (err, results) => {
+  connection.query(query, [userId], (err, results) => {
     if (err) {
       console.error(err);
       res.sendStatus(500); // Send HTTP status code 500 for server error
@@ -1924,10 +2603,370 @@ app.get("/allusersotherfielddata", (req, res) => {
     // Process the data and add the image URLs to the response
     const dataWithImageUrls = results.map((user) => ({
       ...user,
-      image_url: user.field_value ? userImagesBaseUrl + user.field_value : null,
+      field_value: user.field_value
+        ? userImagesBaseUrl + user.field_value
+        : null,
     }));
 
     res.send({ data: dataWithImageUrls }); // Send the updated data back to the client
+  });
+});
+// update user other field data
+app.put(
+  "/updateuserotherfielddata/:user_id",
+  upload10.single("field_value"),
+  async (req, res) => {
+    console.log("PUT updateuserotherfielddata API hit");
+    try {
+      // Extract data from the request body
+      const { field_name, lastUpdatedBy, remark, id } = req.body;
+
+      console.log("req.body##", req.body);
+      console.log("user_id", req.params.user_id);
+
+      const getUsersQuery =
+        "SELECT * FROM user_other_field_mast WHERE user_id = ?";
+
+      connection.query(
+        getUsersQuery,
+        [req.body.id],
+        (error, results, fields) => {
+          if (error) {
+            console.error("Error executing query:", error);
+            return;
+          }
+          console.log("results update user", results);
+
+          const userId = req.params.user_id;
+          const fieldName = field_name || results[0].field_name;
+          const lastUpdatedby = lastUpdatedBy || 0;
+          const fieldValue = req.file
+            ? req.file.filename
+            : results[0].field_value; // Use req.file.filename to get the uploaded file name
+          const createdAt = new Date();
+          const Remark = remark || results[0].remark;
+
+          // Update the user's other field data in the user_other_field_mast table
+          const updateFieldQuery = `
+      UPDATE user_other_field_mast
+      SET
+        field_name = ?,
+        field_value = ?,
+        lastupdated_at  = ?,
+        lastupdated_by  = ?,
+        remark = ?
+      WHERE user_id = ? AND id=?
+    `;
+
+          const fieldValues = [
+            fieldName,
+            fieldValue,
+            createdAt,
+            lastUpdatedby,
+            Remark,
+            userId,
+            id,
+          ];
+
+          // Execute the update query for the user field
+          connection.promise().query(updateFieldQuery, fieldValues);
+
+          console.log("User other field data updated successfully");
+          res.status(200).send("User other field data updated successfully");
+        }
+      );
+    } catch (error) {
+      console.error(error);
+      res
+        .status(500)
+        .send(
+          "Error updating user other field data in database: " + error.message
+        );
+    }
+  }
+);
+
+// 21/8/23 reasom_mast post
+app.post("/reasonpost", async (req, res) => {
+  console.log("post reasonpost API hit");
+  try {
+    // Extract data from the request body
+    const { created_by, remark, reason } = req.body;
+
+    const createdBy = created_by || 0;
+    const createdAt = new Date();
+    const Remark = remark || "";
+    const Reason = reason || "";
+
+    // Insert the new reason entry into the reason_mast table using parameterized query
+    const insertFieldQuery = `
+      INSERT INTO reason_mast (created_at, created_by, remark, reason)
+      VALUES (?, ?, ?, ?)
+    `;
+
+    const fieldValues = [createdAt, createdBy, Remark, Reason]; // Add Reason to the values
+
+    // Execute the insert query for the reason entry
+    await connection.promise().query(insertFieldQuery, fieldValues);
+
+    console.log("Reason added successfully");
+    res.status(200).send("Reason added successfully");
+  } catch (error) {
+    console.error(error);
+    res
+      .status(500)
+      .send("Error adding reason to the database: " + error.message);
+  }
+});
+app.get("/allreason", (req, res) => {
+  console.log("Retrieving all data of reason mast");
+
+  const query = `
+    SELECT 
+        rm.*, 
+        u2.user_name AS createdBY_name
+    FROM 
+        reason_mast AS rm
+    LEFT JOIN user_mast AS u2 ON rm.created_by = u2.user_id;
+  `;
+
+  // Send the query to the MySQL database and handle any errors or data retrieved
+  connection.query(query, (err, results) => {
+    if (err) {
+      console.error(err);
+      res.sendStatus(500); // Send HTTP status code 500 for server error
+      return;
+    }
+
+    const data = results.map((row) => ({
+      id: row.id,
+      reason_id: row.reason_id,
+      reason_name: row.reason, // Make sure to include the new column you added
+      remark: row.remark,
+      last_updated_by: row.last_updated_by,
+      last_updated_at: row.last_updated_at,
+      created_by: row.created_by,
+      created_at: row.created_at,
+      createdBY_name: row.createdBY_name, // This is the newly added field
+    }));
+
+    res.send(data); // Send the formatted data back to the client as an array of objects
+  });
+});
+
+//21/8/23 1:51 sepration post api
+
+app.post("/separationpost", async (req, res) => {
+  console.log("post separationpost API hit");
+  try {
+    // Extract data from the request body
+    const {
+      user_id,
+      status,
+      created_by,
+      resignation_date,
+      last_working_day,
+      remark,
+      reason,
+      reinstate_date,
+    } = req.body;
+
+    const userId = user_id || 0;
+    const createdBy = created_by || 0;
+    const createdAt = new Date();
+    const Remark = remark || "";
+    const Reason = reason || "";
+    const Status = status || "";
+    const reinstateDate = reinstate_date || "";
+
+    // Insert the new separation entry into the separation_mast table using parameterized query
+    const insertFieldQuery = `
+      INSERT INTO separation_mast (
+        user_id,
+        status,
+        reason,
+        resignation_date,
+        last_working_day,
+        created_at,
+        created_by,
+        remark,
+        reinstate_date 
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?,?)
+    `;
+
+    const fieldValues = [
+      userId,
+      Status,
+      Reason,
+      resignation_date,
+      last_working_day,
+      createdAt,
+      createdBy,
+      Remark,
+      reinstateDate,
+    ];
+
+    // Execute the insert query for the separation entry
+    await connection.promise().query(insertFieldQuery, fieldValues);
+
+    console.log("Separation entry added successfully");
+    res.status(200).send("Separation entry added successfully");
+  } catch (error) {
+    console.error(error);
+    res
+      .status(500)
+      .send("Error adding separation entry to the database: " + error.message);
+  }
+});
+// get api of saparation_mast
+app.get("/alldataofsapration", (req, res) => {
+  console.log("Retrieving all  data of separation mast");
+
+  const query = `
+  SELECT 
+  sm.*, 
+  u2.user_name AS createdBY_name,
+  u3.user_name AS user,
+  rm.reason AS reasonvalue
+FROM 
+  separation_mast AS sm
+LEFT JOIN user_mast AS u2 ON sm.created_by = u2.user_id
+LEFT JOIN user_mast AS u3 ON sm.user_id = u3.user_id
+LEFT JOIN reason_mast AS rm ON sm.reason = rm.id;
+
+
+    
+`;
+  // Send the query to the MySQL database and handle any errors or data retrieved
+  connection.query(query, (err, results) => {
+    if (err) {
+      console.error(err);
+      res.sendStatus(500); // Send HTTP status code 500 for server error
+      return;
+    }
+
+    const data = results; // Store the retrieved data in a variable
+
+    res.send({ data: data }); // Send the data back to the client
+  });
+});
+// get sepration data by user_id
+app.get("/dataofsapration/:user_id", (req, res) => {
+  const userId = req.params.user_id; // Get the user ID from the URL parameter
+
+  console.log(`Retrieving data of separation mast for user with ID: ${userId}`);
+
+  // Your SQL query with modifications
+  const query = `
+    SELECT 
+      sm.*, 
+      u2.user_name AS createdBY_name,
+      u3.user_name AS user,
+      rm.reason AS reasonvalue
+    FROM 
+      separation_mast AS sm
+    LEFT JOIN user_mast AS u2 ON sm.created_by = u2.user_id
+    LEFT JOIN user_mast AS u3 ON sm.user_id = u3.user_id
+    LEFT JOIN reason_mast AS rm ON sm.reason = rm.id
+    WHERE
+      sm.user_id = ?;`;
+
+  // Send the query to the MySQL database and handle any errors or data retrieved
+  connection.query(query, [userId], (err, results) => {
+    if (err) {
+      console.error(err);
+      res.sendStatus(500); // Send HTTP status code 500 for server error
+      return;
+    }
+
+    const data = results; // Store the retrieved data in a variable
+
+    res.send({ data: data }); // Send the data back to the client
+  });
+});
+// update sepratiom mast data
+app.put("/seprationupdate", async (req, res) => {
+  console.log("PUT /seprationupdate API hit");
+  const currentDate = new Date();
+
+  try {
+    // Extract data from the request body
+    const {
+      user_id,
+      status,
+      created_by,
+      last_updated_by,
+      resignation_date,
+      last_working_day,
+      remark,
+      reason,
+      id,
+    } = req.body;
+
+    // Check if allocation_date is defined and not empty, otherwise set it to an empty string
+    const userId = user_id || 0;
+    const createdBy = created_by ? parseInt(created_by) : 0;
+    const resignationDate = resignation_date || null;
+    const lastWorkingDay = last_working_day || null;
+    const Status = status || "";
+    const Reason = reason || "";
+    const lastUpdatedBy = last_updated_by ? parseInt(last_updated_by) : 0;
+    const Remark = remark || "";
+
+    // Retrieve the existing separation record from the database
+    const getSeparationQuery = "SELECT * FROM separation_mast WHERE id = ?";
+    const [existingSeparation] = await connection
+      .promise()
+      .query(getSeparationQuery, [id]);
+
+    if (!existingSeparation || !existingSeparation.length) {
+      return res.status(404).send("Separation record not found");
+    }
+
+    // Update the separation details in the database
+    const updateQuery =
+      "UPDATE separation_mast SET user_id = ?, status = ?, reason = ?, resignation_date = ?, last_working_day = ?, remark = ?, last_updated_at = ?, last_updated_by = ? WHERE id = ?";
+    const updateValues = [
+      userId,
+      Status,
+      Reason,
+      resignationDate,
+      lastWorkingDay,
+      Remark,
+      currentDate,
+      lastUpdatedBy,
+      id,
+    ];
+
+    await connection.promise().query(updateQuery, updateValues);
+
+    console.log("Separation details updated successfully");
+    res.status(200).send("Separation details updated successfully");
+  } catch (error) {
+    console.error(error);
+    res
+      .status(500)
+      .send(
+        "Error updating the separation details in the database: " +
+          error.message
+      );
+  }
+});
+
+//for download images
+
+app.get("/download/:filename", (req, res) => {
+  const fileName = req.params.filename;
+  const filePath = path.resolve(__dirname, "uploads", fileName);
+
+  res.setHeader("Content-Disposition", `attachment; filename=${fileName}`);
+  res.setHeader("Content-Type", "image/png"); // Adjust the content type as needed
+
+  res.sendFile(filePath, (err) => {
+    if (err) {
+      res.status(404).send("File not found.");
+    }
   });
 });
 

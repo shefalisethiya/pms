@@ -1,8 +1,39 @@
 const express = require("express");
 const app = express.Router();
 const multer = require("multer");
-
 const connection = require("../db");
+const admin = require("firebase-admin");
+
+const serviceAccount = require("./browser-notify-b7b37-firebase-adminsdk-e58t5-118e564ed9.json");
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
+
+app.post("/notification", async (req, res) => {
+  const { title, body } = req.body;
+
+  const tokens = [];
+
+  try {
+    await Promise.all(
+      tokens.map(async (token) => {
+        await admin.messaging().send({
+          token,
+          notification: {
+            title,
+            body,
+          },
+        });
+      })
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error sending notification:", error);
+    res.status(500).json({ error: "Error sending notification" });
+  }
+});
+
 app.post("/orderreqs", async (req, res) => {
   console.log("POST /orderreqs API hit");
   try {
@@ -91,7 +122,7 @@ app.post("/orderreqs", async (req, res) => {
       };
     });
 
-    console.log("modifiedOrderRequests##", modifiedOrderRequests);
+    // console.log("modifiedOrderRequests##", modifiedOrderRequests);
 
     res.status(200).json(modifiedOrderRequests);
   } catch (error) {
@@ -181,7 +212,7 @@ app.get("/orderreqshistory/:user_id", async (req, res) => {
       };
     });
 
-    console.log("modifiedOrderRequests##", modifiedOrderRequests);
+    // console.log("modifiedOrderRequests##", modifiedOrderRequests);
 
     res.status(200).json(modifiedOrderRequests);
   } catch (error) {
@@ -233,25 +264,27 @@ app.get("/allorderrequest", async (req, res) => {
   try {
     // Retrieve all order requests with additional information from the database
     const query = `
-      SELECT
-        Order_req_mast.user_id,
-        user_mast.User_id,
-        user_mast.User_name,
-        Product_mast.Product_name,
-        Product_mast.Product_image,
-        Order_req_mast.order_quantity,
-        Sitting_mast.Sitting_id,
-        Sitting_mast.Sitting_area,
-        Sitting_mast.Sitting_ref_no,
-        Order_req_mast.Request_datetime,
-        Order_req_mast.Message,
-        Order_req_mast.Order_req_id
-      FROM
-        Order_req_mast
-        INNER JOIN user_mast ON Order_req_mast.user_id = user_mast.user_id
-        INNER JOIN Product_mast ON Order_req_mast.Product_id = Product_mast.Product_id
-        INNER JOIN Sitting_mast ON Order_req_mast.Sitting_id = Sitting_mast.Sitting_id
-      WHERE Order_req_mast.status = 'pending'
+    SELECT
+    Order_req_mast.user_id,
+    user_mast.User_id,
+    user_mast.dept_id,
+    user_mast.User_name,
+    Product_mast.Product_name,
+    Product_mast.Product_image,
+    Order_req_mast.order_quantity,
+    Sitting_mast.Sitting_id,
+    Sitting_mast.Sitting_area,
+    Sitting_mast.Sitting_ref_no,
+    Order_req_mast.Request_datetime,
+    Order_req_mast.Message,
+    Order_req_mast.Order_req_id
+  FROM
+    Order_req_mast
+    INNER JOIN user_mast ON Order_req_mast.user_id = user_mast.user_id
+    INNER JOIN Product_mast ON Order_req_mast.Product_id = Product_mast.Product_id
+    INNER JOIN Sitting_mast ON Order_req_mast.Sitting_id = Sitting_mast.Sitting_id
+  WHERE Order_req_mast.status = 'pending';
+  
     `;
 
     const [orderRequests] = await connection.promise().query(query);
@@ -276,10 +309,11 @@ app.get("/allorderrequest", async (req, res) => {
         Request_datetime: ` ${orderRequest.Request_datetime}`,
         Message: ` ${orderRequest.Message}`,
         Order_req_id: ` ${orderRequest.Order_req_id}`,
+        dept_id: ` ${orderRequest.dept_id}`,
       };
     });
 
-    console.log("modifiedOrderRequests##", modifiedOrderRequests);
+    // console.log("modifiedOrderRequests##", modifiedOrderRequests);
 
     // Send the order requests as JSON response
     res.status(200).json(modifiedOrderRequests);
@@ -292,50 +326,302 @@ app.get("/allorderrequest", async (req, res) => {
 });
 const path = require("path");
 
-app.use(
-  "/product_images",
-  express.static(path.join(__dirname, "product_images"))
-);
+//18/8/23
+// app.get("/productdata", async (req, res) => {
+//   try {
+//     // Retrieve products from the database
+//     const query = "SELECT * FROM Product_mast";
+//     const [products] = await connection.promise().query(query);
+
+//     // Create an array to store the product data
+//     const productData = [];
+
+//     products.forEach((product) => {
+//       // Construct full image URL
+//       const imageUrl = `${req.protocol}://${req.get("host")}/product_images/${
+//         product.Product_image
+//       }`;
+
+//       // Create an object for each product
+//       const productObj = {
+//         Product_id: product.Product_id,
+//         Product_name: product.Product_name,
+//         Product_type: product.Product_type,
+//         Duration: product.Duration,
+//         Stock_qty: product.Stock_qty,
+//         Unit: product.Unit,
+//         Opening_stock: product.Opening_stock,
+//         Opening_stock_date: product.Opening_stock_date,
+//         Remarks: product.Remarks,
+//         Creation_date: product.creation_date,
+//         Created_by: product.Created_by,
+//         Last_updated_by: product.Last_updated_by,
+//         Last_updated_date: product.Last_updated_date,
+//         props1: product.props1,
+//         props2: product.props2,
+//         props3: product.props3,
+//         Product_image_url: imageUrl,
+//         Product_image_download_url: imageUrl, // This can be modified for downloadable URL
+//       };
+
+//       productData.push(productObj);
+//     });
+
+//     // Send the product data as JSON response
+//     res.status(200).json(productData);
+//   } catch (error) {
+//     console.error("Error retrieving products from the database:", error);
+//     res.status(500).send("Error retrieving products from the database");
+//   }
+// });
+//5:31 check productdata code in html
+// app.get("/productdata", async (req, res) => {
+//   try {
+//     // Retrieve products from the database
+//     const query = "SELECT * FROM Product_mast";
+//     const [products] = await connection.promise().query(query);
+
+//     // Create the HTML response
+//     let html = `
+//       <!DOCTYPE html>
+//       <html>
+//       <head>
+//         <title>Product Data</title>
+//         <style>
+//           /* Add your custom CSS styles here */
+//           body {
+//             font-family: Arial, sans-serif;
+//           }
+//           .product {
+//             border: 1px solid #ccc;
+//             padding: 10px;
+//             margin: 10px;
+//           }
+//           .product img {
+//             max-width: 100px;
+//             max-height: 100px;
+//           }
+//         </style>
+//       </head>
+//       <body>
+//         <h1>Product Data</h1>
+//     `;
+
+//     products.forEach((product) => {
+//       // Construct full image URL
+//       const imageUrl = `${req.protocol}://${req.get("host")}/product_images/${
+//         product.Product_image
+//       }`;
+
+//       // Construct downloadable URL for the image
+//       const downloadUrl = `${req.protocol}://${req.get(
+//         "host"
+//       )}/product_images/${product.Product_image}`;
+
+//       html += `
+//         <div class="product">
+//           <h2>Product Name: ${product.Product_name}</h2>
+//           <p>Product Type: ${product.Product_type}</p>
+//           <p>Duration: ${product.Duration}</p>
+
+//             <img src="${imageUrl}" alt="Product Image" width="100" height="100">
+//           </a>
+//         </div>
+//       `;
+//     });
+
+//     html += `
+//       </body>
+//       </html>
+//     `;
+
+//     // Set the response content type to HTML
+//     res.setHeader("Content-Type", "text/html");
+
+//     // Send the HTML response
+//     res.status(200).send(html);
+//   } catch (error) {
+//     console.error("Error retrieving products from the database:", error);
+//     res.status(500).send("Error retrieving products from the database");
+//   }
+// });
+// 6:00 product data with image view json formate data
+// app.get("/productdata", async (req, res) => {
+//   try {
+//     // Retrieve products from the database
+//     const query = "SELECT * FROM Product_mast";
+//     const [products] = await connection.promise().query(query);
+
+//     // Create an array to store the product data
+//     const productData = [];
+
+//     products.forEach((product) => {
+//       // Construct full image URL
+//       const imageUrl = `${req.protocol}://${req.get("host")}/product_images/${
+//         product.Product_image
+//       }`;
+
+//       // Construct downloadable URL for the image
+//       const downloadUrl = `${req.protocol}://${req.get(
+//         "host"
+//       )}/product_images/${product.Product_image}`;
+
+//       // Create an object for each product
+//       const productObj = {
+//         Product_id: product.Product_id,
+//         Product_name: product.Product_name,
+//         Product_type: product.Product_type,
+//         Duration: product.Duration,
+//         Stock_qty: product.Stock_qty,
+//         Unit: product.Unit,
+//         Opening_stock: product.Opening_stock,
+//         Opening_stock_date: product.Opening_stock_date,
+//         Remarks: product.Remarks,
+//         Creation_date: product.creation_date,
+//         Created_by: product.Created_by,
+//         Last_updated_by: product.Last_updated_by,
+//         Last_updated_date: product.Last_updated_date,
+//         props1: product.props1,
+//         props2: product.props2,
+//         props3: product.props3,
+//         Product_image_url: imageUrl,
+//         Product_image_download_url: downloadUrl,
+//       };
+
+//       productData.push(productObj);
+//     });
+
+//     // Send the product data as JSON response
+//     res.status(200).json(productData);
+//   } catch (error) {
+//     console.error("Error retrieving products from the database:", error);
+//     res.status(500).send("Error retrieving products from the database");
+//   }
+// });
+// 2/9/23 check code_ working code
+// app.get("/productdata", async (req, res) => {
+//   try {
+//     // Retrieve products with their associated properties (or null)
+//     const query = `
+//       SELECT
+//         p.Product_id,
+//         p.Product_name,
+//         p.Product_type,
+//         p.Duration,
+//         p.Stock_qty,
+//         p.Unit,
+//         p.Opening_stock,
+//         p.Opening_stock_date,
+//         p.Remarks,
+//         p.Creation_date,
+//         p.Created_by,
+//         p.Last_updated_by,
+//         p.Last_updated_date,
+//         COALESCE(GROUP_CONCAT(pp.prop_name SEPARATOR ', '), NULL) AS Product_Prop
+//       FROM Product_mast AS p
+//       LEFT JOIN product_props_mast AS pp
+//       ON p.Product_id = pp.product_id
+//       GROUP BY p.Product_id
+//     `;
+//     const [productsWithProperties] = await connection.promise().query(query);
+
+//     // Create an array to store the product data
+//     const productData = productsWithProperties.map((product) => {
+//       // Construct full image URL
+//       const imageUrl = `${req.protocol}://${req.get("host")}/product_images/${
+//         product.Product_image
+//       }`;
+
+//       // Construct downloadable URL for the image
+//       const downloadUrl = `${req.protocol}://${req.get(
+//         "host"
+//       )}/product_images/${product.Product_image}`;
+
+//       return {
+//         Product_id: product.Product_id,
+//         Product_name: product.Product_name,
+//         Product_type: product.Product_type,
+//         Duration: product.Duration,
+//         Stock_qty: product.Stock_qty,
+//         Unit: product.Unit,
+//         Opening_stock: product.Opening_stock,
+//         Opening_stock_date: product.Opening_stock_date,
+//         Remarks: product.Remarks,
+//         Creation_date: product.Creation_date,
+//         Created_by: product.Created_by,
+//         Last_updated_by: product.Last_updated_by,
+//         Last_updated_date: product.Last_updated_date,
+//         Product_Prop: product.Product_Prop, // Comma-separated list of prop_name values
+//         Product_image_url: imageUrl,
+//         Product_image_download_url: downloadUrl,
+//       };
+//     });
+
+//     // Send the product data as JSON response
+//     res.status(200).json(productData);
+//   } catch (error) {
+//     console.error("Error retrieving products from the database:", error);
+//     res.status(500).send("Error retrieving products from the database");
+//   }
+// });
 app.get("/productdata", async (req, res) => {
   try {
-    // Retrieve products from the database
-    const query = "SELECT * FROM Product_mast";
-    const [products] = await connection.promise().query(query);
+    // Retrieve products with their associated properties (or null)
+    const query = `
+    SELECT
+    p.Product_id,
+    p.Product_name,
+    p.Product_type,
+    p.Duration,
+    p.Stock_qty,
+    p.Unit,
+    p.Opening_stock,
+    p.Opening_stock_date,
+    p.Remarks,
+    p.Creation_date,
+    p.Created_by,
+    p.Last_updated_by,
+    p.Last_updated_date,
+    JSON_ARRAYAGG(JSON_OBJECT('id', pp.id, 'type_id', pp.type_id, 'prop_name', pp.prop_name)) AS Product_Prop,
+    p.Product_image
+FROM Product_mast AS p
+LEFT JOIN product_props_mast AS pp
+ON p.Product_id = pp.product_id
+GROUP BY p.Product_id
+
+    `;
+    const [productsWithProperties] = await connection.promise().query(query);
 
     // Create an array to store the product data
-    const productData = [];
+    const productData = productsWithProperties.map((product) => {
+      // Construct full image URL
+      const imageUrl = `${req.protocol}://${req.get("host")}/product_images/${
+        product.Product_image
+      }`;
 
-    // Process each product and add it to the array
-    products.forEach((product) => {
-      const productObj = {
-        // Product_id: product.Product_id,
-        // Product_image: product.Product_image
-        //   ? `${req.protocol}://${req.get('host')}/product_images/${product.Product_image}`
-        //   : null,
+      // Construct downloadable URL for the image
+      const downloadUrl = `${req.protocol}://${req.get(
+        "host"
+      )}/product_images/${product.Product_image}?download=true`;
+
+      return {
         Product_id: product.Product_id,
         Product_name: product.Product_name,
         Product_type: product.Product_type,
-        Product_image: product.Product_image
-          ? `${req.protocol}://${req.get("host")}/product_images/${
-              product.Product_image
-            }`
-          : null,
         Duration: product.Duration,
         Stock_qty: product.Stock_qty,
         Unit: product.Unit,
         Opening_stock: product.Opening_stock,
         Opening_stock_date: product.Opening_stock_date,
         Remarks: product.Remarks,
-        Creation_date: product.creation_date,
+        Creation_date: product.Creation_date,
         Created_by: product.Created_by,
         Last_updated_by: product.Last_updated_by,
         Last_updated_date: product.Last_updated_date,
-        props1: product.props1,
-        props2: product.props2,
-        props3: product.props3,
+        Product_Prop: product.Product_Prop,
+        Product_image_url: imageUrl,
+        Product_image_download_url: downloadUrl,
       };
-
-      productData.push(productObj);
     });
 
     // Send the product data as JSON response
@@ -345,6 +631,150 @@ app.get("/productdata", async (req, res) => {
     res.status(500).send("Error retrieving products from the database");
   }
 });
+
+//   try {
+//     // Retrieve products with their associated properties (or null)
+//     const query = `
+//       SELECT
+//         p.Product_id,
+//         p.Product_name,
+//         p.Product_type,
+//         p.Duration,
+//         p.Stock_qty,
+//         p.Unit,
+//         p.Opening_stock,
+//         p.Opening_stock_date,
+//         p.Remarks,
+//         p.Creation_date,
+//         p.Created_by,
+//         p.Last_updated_by,
+//         p.Last_updated_date,
+//         pp.type_id as typeId,
+//         COALESCE(GROUP_CONCAT(pp.prop_name SEPARATOR ', '), NULL) AS Product_Prop,
+//         p.Product_image AS Product_Image_Name
+//       FROM Product_mast AS p
+//       LEFT JOIN product_props_mast AS pp
+//       ON p.Product_id = pp.product_id
+//       GROUP BY p.Product_id
+//     `;
+//     const [productsWithProperties] = await connection.promise().query(query);
+
+//     // Create an array to store the product data
+//     const productData = productsWithProperties.map((product) => {
+//       // Construct full image URL
+//       const imageUrl = `${req.protocol}://${req.get("host")}/product_images/${
+//         product.Product_Image_Name
+//       }`;
+
+//       // Construct downloadable URL for the image
+//       const downloadUrl = imageUrl; // Use the same URL for download
+
+//       return {
+//         Product_id: product.Product_id,
+//         Product_name: product.Product_name,
+//         Product_type: product.Product_type,
+//         Duration: product.Duration,
+//         Stock_qty: product.Stock_qty,
+//         Unit: product.Unit,
+//         Opening_stock: product.Opening_stock,
+//         Opening_stock_date: product.Opening_stock_date,
+//         Remarks: product.Remarks,
+//         Creation_date: product.Creation_date,
+//         Created_by: product.Created_by,
+//         Last_updated_by: product.Last_updated_by,
+//         Last_updated_date: product.Last_updated_date,
+//         Product_Prop: product.Product_Prop, // Comma-separated list of prop_name values
+//         type_id: product.typeId,
+//         Product_image_url: imageUrl,
+//         Product_image_download_url: downloadUrl, // Use the same URL for download
+//       };
+//     });
+
+//     // Send the product data as JSON response
+//     res.status(200).json(productData);
+//   } catch (error) {
+//     console.error("Error retrieving products from the database:", error);
+//     res.status(500).send("Error retrieving products from the database");
+//   }
+// });
+// get productdata through product_id
+app.get("/productdata/:id", async (req, res) => {
+  try {
+    // Get the product_id from the route parameter
+    const product_id = req.params.id;
+
+    // Retrieve products with their associated properties (or null) for the specified product_id
+    const query = `
+      SELECT
+        p.Product_id,
+        p.Product_name,
+        p.Product_type,
+        p.Duration,
+        p.Stock_qty,
+        p.Unit,
+        p.Opening_stock,
+        p.Opening_stock_date,
+        p.Remarks,
+        p.Creation_date,
+        p.Created_by,
+        p.Last_updated_by,
+        p.Last_updated_date,
+        JSON_ARRAYAGG(JSON_OBJECT('id', pp.id, 'type_id', pp.type_id, 'prop_name', pp.prop_name)) AS Product_Prop,
+        p.Product_image
+      FROM Product_mast AS p
+      LEFT JOIN product_props_mast AS pp
+      ON p.Product_id = pp.product_id
+      WHERE p.Product_id = ?
+      GROUP BY p.Product_id
+    `;
+
+    const [productWithProperties] = await connection
+      .promise()
+      .query(query, [product_id]);
+
+    if (!productWithProperties.length) {
+      // If no product with the specified product_id is found, return a not found response
+      return res.status(404).json({ error: "Product not found" });
+    }
+
+    // Construct full image URL
+    const imageUrl = `${req.protocol}://${req.get("host")}/product_images/${
+      productWithProperties[0].Product_image
+    }`;
+
+    // Construct downloadable URL for the image
+    const downloadUrl = `${req.protocol}://${req.get("host")}/product_images/${
+      productWithProperties[0].Product_image
+    }?download=true`;
+
+    // Create an object to store the product data
+    const productData = {
+      Product_id: productWithProperties[0].Product_id,
+      Product_name: productWithProperties[0].Product_name,
+      Product_type: productWithProperties[0].Product_type,
+      Duration: productWithProperties[0].Duration,
+      Stock_qty: productWithProperties[0].Stock_qty,
+      Unit: productWithProperties[0].Unit,
+      Opening_stock: productWithProperties[0].Opening_stock,
+      Opening_stock_date: productWithProperties[0].Opening_stock_date,
+      Remarks: productWithProperties[0].Remarks,
+      Creation_date: productWithProperties[0].Creation_date,
+      Created_by: productWithProperties[0].Created_by,
+      Last_updated_by: productWithProperties[0].Last_updated_by,
+      Last_updated_date: productWithProperties[0].Last_updated_date,
+      Product_Prop: productWithProperties[0].Product_Prop, // Comma-separated list of prop_name values
+      Product_image_url: imageUrl,
+      Product_image_download_url: downloadUrl,
+    };
+
+    // Send the product data as JSON response
+    res.status(200).json(productData);
+  } catch (error) {
+    console.error("Error retrieving product from the database:", error);
+    res.status(500).send("Error retrieving product from the database");
+  }
+});
+
 app.get("/userorderrequest", async (req, res) => {
   console.log("GET /userorderrequest API hit");
   try {
@@ -836,37 +1266,7 @@ app.get("/alltransreq", (req, res) => {
     res.json({ data }); // Send the data back to the client as JSON
   });
 });
-app.get("/productdata", async (req, res) => {
-  try {
-    // Retrieve products from the database
-    const query = "SELECT * FROM Product_mast";
-    const [products] = await connection.promise().query(query);
 
-    // Create the HTML string with the products and images
-    let html = "<html><body>";
-    products.forEach((product) => {
-      if (product.Product_image) {
-        const imageUrl = `${req.protocol}://${req.get("host")}/upload/${
-          product.Product_image
-        }`;
-        html += `<div><img src="${imageUrl}" alt="Product Image" width="100" height="100"></div>`;
-      } else {
-        html += "<div>No image available</div>";
-      }
-      html += `<div>${product.Product_name}</div>`;
-      html += `<div>${product.Product_description}</div>`;
-      html += `<div>${product.Price}</div>`;
-      html += "<hr>";
-    });
-    html += "</body></html>";
-
-    // Send the HTML response
-    res.status(200).send(html);
-  } catch (error) {
-    console.error("Error retrieving products from the database:", error);
-    res.status(500).send("Error retrieving products from the database");
-  }
-});
 // code 22/6/23 post order request data
 app.post("/ordereq", async (req, res) => {
   console.log("post order req api hit");
@@ -887,11 +1287,11 @@ app.post("/ordereq", async (req, res) => {
       created_by,
       room_id,
       props1,
-      props2,
-      props3,
-      props1Int,
-      props2Int,
-      props3Int,
+      // props2,
+      // props3,
+      // props1Int,
+      // props2Int,
+      // props3Int,
     } = req.body;
 
     console.log("orderreq req.body", req.body);
@@ -900,11 +1300,11 @@ app.post("/ordereq", async (req, res) => {
     const Order_quantity = order_quantity || "";
     const Special_request = special_request || "";
     const Props1 = props1 || null;
-    const Props2 = props2 || null;
-    const Props3 = props3 || null;
-    const props1int = props1Int || 0;
-    const props2int = props2Int || 0;
-    const props3int = props3Int || 0;
+    // const Props2 = props2 || null;
+    // const Props3 = props3 || null;
+    // const props1int = props1Int || 0;
+    // const props2int = props2Int || 0;
+    // const props3int = props3Int || 0;
 
     const User_id = user_id ? parseInt(user_id) : 0;
     const Sitting_id = sitting_id ? parseInt(sitting_id) : 0;
@@ -930,8 +1330,8 @@ app.post("/ordereq", async (req, res) => {
     Request_datetime.setHours(Request_datetime.getHours() + 5);
     Request_datetime.setMinutes(Request_datetime.getMinutes() + 30);
 
-    const query = `INSERT INTO Order_req_mast (Product_id, Order_quantity, Special_request, User_id, Sitting_id, Request_datetime, Status, Request_delivered_by, Delivered_datetime, Message, Remarks, Creation_date, Created_by, room_id,props1,props2,props3,props1Int,props2Int,props3Int   )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?,?,?,?,?,?)`;
+    const query = `INSERT INTO Order_req_mast (Product_id, Order_quantity, Special_request, User_id, Sitting_id, Request_datetime, Status, Request_delivered_by, Delivered_datetime, Message, Remarks, Creation_date, Created_by, room_id,props1   )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?)`;
 
     const values = [
       Product_id,
@@ -949,11 +1349,11 @@ app.post("/ordereq", async (req, res) => {
       Created_by,
       Room_id,
       Props1,
-      Props2,
-      Props3,
-      props1int,
-      props2int,
-      props3int,
+      // Props2,
+      // Props3,
+      // props1int,
+      // props2int,
+      // props3int,
     ];
     console.log("values", values);
     const result = await connection.promise().query(query, values);
@@ -967,17 +1367,30 @@ app.post("/ordereq", async (req, res) => {
       .send("Error adding order request to the database: " + error.message);
   }
 });
+
+let timers = {}; // Store to keep track of start times for different order request IDs
+
 app.get("/allorderreqdata", (req, res) => {
   console.log("Retrieving all order request information");
 
-  const query = `SELECT Order_req_mast.*, user_mast1.user_name AS delivered_by_name, 
-                 user_mast2.user_name AS user_name, Sitting_mast1.Sitting_ref_no,
-                 Sitting_mast1.Sitting_area, Product_mast.Product_name 
-                 FROM Order_req_mast
-                 JOIN user_mast AS user_mast1 ON Order_req_mast.Request_delivered_by = user_mast1.user_id
-                 JOIN user_mast AS user_mast2 ON Order_req_mast.User_id = user_mast2.user_id
-                 JOIN Sitting_mast AS Sitting_mast1 ON Order_req_mast.Sitting_id = Sitting_mast1.sitting_id
-                 JOIN Product_mast ON Order_req_mast.Product_id = Product_mast.Product_id`;
+  const query = `
+      SELECT 
+        Order_req_mast.*,
+        user_mast1.user_name AS delivered_by_name,
+        user_mast2.user_name AS user_name,
+        user_mast3.user_name AS Request_delivered_by_name,
+        user_mast2.dept_id AS dept_id,
+        Sitting_mast1.Sitting_ref_no,
+        Sitting_mast1.Sitting_area,
+        Product_mast.Product_name,
+        Product_mast.Duration
+      FROM Order_req_mast
+      JOIN user_mast AS user_mast1 ON Order_req_mast.Request_delivered_by = user_mast1.user_id
+      JOIN user_mast AS user_mast2 ON Order_req_mast.User_id = user_mast2.user_id
+      JOIN user_mast AS user_mast3 ON Order_req_mast.Request_delivered_by = user_mast3.user_id
+      JOIN Sitting_mast AS Sitting_mast1 ON Order_req_mast.Sitting_id = Sitting_mast1.sitting_id
+      JOIN Product_mast ON Order_req_mast.Product_id = Product_mast.Product_id;
+    `;
 
   // Send the query to the MySQL database and handle any errors or data retrieved
   connection.query(query, (err, results) => {
@@ -989,9 +1402,34 @@ app.get("/allorderreqdata", (req, res) => {
 
     const data = results; // Store the retrieved data in a variable
 
-    res.send({ data: data }); // Send the data back to the client
+    // Calculate the countdown timers based on the "Duration" from the database
+    const currentTime = new Date();
+    const responseData = data.map((item) => {
+      const orderRequestId = item.Order_req_id;
+
+      if (!timers[orderRequestId]) {
+        timers[orderRequestId] = {
+          startTime: currentTime,
+          duration: item.Duration * 60000, // Convert Duration to milliseconds
+        };
+      }
+
+      const elapsedTime = currentTime - timers[orderRequestId].startTime;
+      const remainingTime = timers[orderRequestId].duration - elapsedTime;
+
+      const secondsRemaining = Math.floor(remainingTime / 1000);
+      const formattedTimer = Math.max(secondsRemaining, 0); // Ensure the timer is not negative
+
+      return {
+        ...item,
+        timer: formattedTimer,
+      };
+    });
+
+    res.send({ data: responseData }); // Send the data back to the client with countdown timers
   });
 });
+
 app.put("/orderrequesttransbyman", async (req, res) => {
   const order_req_id = req.body.order_req_id;
   console.log("update Order_req", order_req_id);
@@ -1149,4 +1587,211 @@ app.put("/statusupdatebymanager", async (req, res) => {
       .send("Error updating order request in the database: " + error.message);
   }
 });
+// 31/8/23 product_props_mast Post
+// app.post("/propspost", async (req, res) => {
+//   console.log("post product props api hit");
+
+//   try {
+//     // Extract data from the request body
+//     const { product_id, type_id, prop_name, remark, created_by } = req.body;
+
+//     // If dept_name is not defined or is empty, set it to an empty string
+//     const productId = product_id || 0;
+//     const typeId = type_id || 0;
+//     const propName = prop_name || "";
+
+//     // Check if remark is defined and convert to string
+//     const remarkValue = remark || "";
+//     const created_By = created_by || 0;
+//     // const deptId = dept_id || 0;
+
+//     // Get the current date
+//     const currentDate = new Date();
+//     const creation_date = currentDate.toISOString().split("T")[0]; // Extract only the date part
+
+//     // Check if location_id is defined and convert to integer
+//     // const locationIdValue = location_id ? parseInt(location_id) : 0;
+
+//     // Insert the new lead type into the database using a parameterized query
+//     const query =
+//       "INSERT INTO product_props_mast(product_id,type_id,prop_name ,  created_at , created_by ) VALUES (?, ?, ?, ?,?)";
+//     const values = [
+//       productId,
+//       typeId,
+//       propName,
+//       // remarkValue,
+//       creation_date,
+//       created_By,
+//       // locationIdValue,
+//     ];
+//     const result = await connection.promise().query(query, values);
+
+//     // console.log('Department added successfully');
+//     res.status(200).send("props added successfully");
+//   } catch (error) {
+//     console.error(error);
+//     res.status(500).send("Failed to add props to database");
+//   }
+// });
+//2/9/23 check code
+app.post("/proppost", async (req, res) => {
+  console.log("post productpropspost API hit");
+  try {
+    // Extract data from the request body
+    const { type_id, prop_name, remark, created_by } = req.body;
+
+    const typeId = type_id || 0;
+    const propName = prop_name || "";
+    const createdBy = created_by || 0;
+    const createdAt = new Date();
+
+    // Insert the new user field into the product_props_mast table
+    const insertFieldQuery = `
+      INSERT INTO product_props_mast  (
+        product_id ,
+        type_id ,
+        prop_name ,
+        created_by ,
+        created_at 
+      )
+      VALUES (?,?,?,?,?)
+    `;
+
+    const fieldValues = [
+      0, // Temporary product_id value
+      typeId,
+      propName,
+      createdBy,
+      createdAt,
+    ];
+
+    // Execute the insert query for the product field
+    await connection.promise().query(insertFieldQuery, fieldValues);
+
+    console.log("prop added successfully");
+
+    // Get the ID of the last inserted row in Product_mast
+    const lastProductQuery =
+      "SELECT Product_id  FROM Product_mast ORDER BY Product_id  DESC LIMIT 1";
+    const [lastProductResult] = await connection
+      .promise()
+      .query(lastProductQuery);
+    const lastProductId = lastProductResult[0].Product_id;
+    console.log("lastProductId", lastProductId);
+
+    // Update the product_id in the product_props_mast table for the last inserted record
+    const updateProductFieldQuery = `
+      UPDATE product_props_mast 
+      SET product_id= ?
+      WHERE id = LAST_INSERT_ID()
+    `;
+
+    await connection.promise().query(updateProductFieldQuery, [lastProductId]);
+
+    console.log("product_id in product_props_mast updated successfully");
+
+    res.status(200).send("Product prop added successfully");
+  } catch (error) {
+    console.error(error);
+    res
+      .status(500)
+      .send("Error adding product prop to database: " + error.message);
+  }
+});
+
+// get props data
+app.get("/propsdata/:product_id", (req, res) => {
+  const productId = req.params.product_id; // Get the product ID from the URL parameter
+  console.log(
+    `Retrieving product props information for product ID: ${productId}`
+  );
+
+  const query = `
+    SELECT 
+      p.*,
+      t.Product_name
+    FROM 
+      product_props_mast AS p
+      LEFT JOIN Product_mast AS t ON p.product_id = t.Product_id 
+    WHERE
+      p.product_id = ?;
+  `;
+
+  // Send the query to the MySQL database with the product ID parameter and handle any errors or data retrieved
+  connection.query(query, [productId], (err, results) => {
+    if (err) {
+      console.error(err);
+      res.sendStatus(500); // Send HTTP status code 500 for server error
+      return;
+    }
+
+    const data = results; // Store the retrieved data in a variable
+
+    res.send({ data: data }); // Send the data back to the client
+  });
+});
+//update props data
+app.put("/propsdataupdate/:id", (req, res) => {
+  var d1 = new Date();
+
+  // Extract data from the request body and URL parameter
+  const { product_id, type_id, prop_name, Last_updated_by } = req.body;
+  const id = req.params.id;
+
+  // Construct the update object with empty values for unspecified fields
+  const updateObject = {
+    product_id: product_id || 0,
+    prop_name: prop_name || "",
+    type_id: type_id || 0,
+    last_updated_by: Last_updated_by || 0,
+    last_updated_at: d1,
+  };
+
+  // Updating sitting record in the database using the provided ID
+  connection.query(
+    "UPDATE product_props_mast SET ? WHERE id = ?",
+    [updateObject, id],
+    (err, result) => {
+      if (err) {
+        console.log(err);
+        // If an error occurs during the update query, send a 500 status code
+        res.sendStatus(500);
+        return;
+      }
+      if (result.affectedRows === 0) {
+        // If no rows were affected by the update query, the sitting record with the provided ID was not found
+        const message = `desi record with ID ${id} not found`;
+        res.status(404).send(message);
+        return;
+      }
+      // If the update query was successful and at least one row was affected, send a success message
+      const message = `desi record with ID ${id} updated successfully`;
+      res.status(200).send({ message });
+    }
+  );
+});
+
+app.delete("/propdelete/:id", (req, res) => {
+  const id = req.params.id;
+  console.log("for props deleteid##", id);
+  connection.query(
+    "DELETE FROM product_props_mast WHERE id = ?",
+    [id],
+    (err, results) => {
+      if (err) {
+        console.error(err);
+        res.sendStatus(500);
+        return;
+      }
+      if (results.affectedRows === 0) {
+        const message = `Product prop with ID ${id} not found`;
+        res.status(404).send(message);
+        return;
+      }
+      const message = `Product prop with ID ${id} deleted successfully`;
+      res.status(200).send({ message });
+    }
+  );
+});
+
 module.exports = app;

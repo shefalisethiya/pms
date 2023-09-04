@@ -80,6 +80,7 @@ app.get("/jobrespon/:user_id", (req, res) => {
       SELECT 
         ujr.*, 
         u2.user_name AS user_name,
+        u2.user_email_id AS user_email_id,
         d.dept_name AS department_name,
         dm.desi_name AS designation_name
       FROM 

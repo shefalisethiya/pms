@@ -135,4 +135,181 @@ app.delete("/deptdelete/:id", (req, res) => {
     }
   );
 });
+// 21/8/23 sub_dept post
+app.post("/subdept", async (req, res) => {
+  console.log("post sub_department API hit");
+
+  try {
+    // Extract data from the request body
+    const { sub_dept_name, dept_id, remark, created_by } = req.body;
+
+    // Set default values if not provided
+    const subDeptName = sub_dept_name || "";
+    const deptId = dept_id || 0;
+    const remarkValue = remark || "";
+    const createdBy = created_by || 0;
+
+    // Get the current date
+    const currentDate = new Date();
+    const createdAt = currentDate.toISOString().split("T")[0]; // Extract only the date part
+
+    // Insert the new sub-department into the database using a parameterized query
+    const insertQuery =
+      "INSERT INTO sub_department (sub_dept_name, dept_id, remark, created_at, created_by) VALUES (?, ?, ?, ?, ?)";
+    const insertValues = [
+      subDeptName,
+      deptId,
+      remarkValue,
+      createdAt,
+      createdBy,
+    ];
+
+    // Execute the insert query for the sub-department
+    await connection.promise().query(insertQuery, insertValues);
+
+    console.log("Sub-department added successfully");
+    res.status(200).send("Sub-department added successfully");
+  } catch (error) {
+    console.error(error);
+    res
+      .status(500)
+      .send("Error adding sub-department to the database: " + error.message);
+  }
+});
+//22/8/23 get data of sub_dept
+app.get("/allsubdept", (req, res) => {
+  connection.query(
+    `SELECT s.*, d.dept_name 
+    FROM sub_department s
+    LEFT JOIN dept_mast d ON s.dept_id = d.dept_id`,
+    (err, results) => {
+      if (err) {
+        console.error(err);
+        res.sendStatus(500);
+        return;
+      }
+      res.send(results);
+    }
+  );
+});
+// update subdept data
+app.put("/subdeptupdate", (req, res) => {
+  var d1 = new Date();
+
+  // Extract data from the request body
+  const { id,sub_dept_name, dept_id, remark, last_updated_by } = req.body;
+
+  // Update department record in the database
+  connection.query(
+    "UPDATE sub_department SET sub_dept_name = ?, dept_id = ?, last_updated_at = ?,last_updated_by=?,remark=? WHERE id = ?",
+    [sub_dept_name, dept_id, d1, last_updated_by, remark, id],
+    (err, result) => {
+      if (err) {
+        console.error(err);
+        res.sendStatus(500);
+        return;
+      }
+      // if (result.affectedRows === 0) {
+      //   const message = `sub_Department with ID ${id} not found`;
+      //   res.status(404).send(message);
+      //   return;
+      // }
+      const message = `sub_Department with ID ${id} updated successfully`;
+      res.status(200).send({ message });
+    }
+  );
+  // delete subdeptdata
+  app.delete("/subdeptdelete/:id", (req, res) => {
+    const id = req.params.id;
+
+    connection.query(
+      "DELETE FROM sub_department WHERE id = ?",
+      [id],
+      (err, results) => {
+        if (err) {
+          // console.error(err);
+          res.sendStatus(500);
+          return;
+        }
+        if (results.affectedRows === 0) {
+          const message = `subDepartment with ID ${id} not found`;
+          res.status(404).send(message);
+          return;
+        }
+        const message = `subDepartment with ID ${id} deleted successfully`;
+        res.status(200).send({ message });
+      }
+    );
+  });
+});
+
+app.delete("/subdeptdelete/:id", (req, res) => {
+  const id = req.params.id;
+
+  connection.query(
+    "DELETE FROM sub_department WHERE id = ?",
+    [id],
+    (err, results) => {
+      if (err) {
+        // console.error(err);
+        res.sendStatus(500);
+        return;
+      }
+      if (results.affectedRows === 0) {
+        const message = `subDepartment with ID ${id} not found`;
+        res.status(404).send(message);
+        return;
+      }
+      const message = `subDepartment with ID ${id} deleted successfully`;
+      res.status(200).send({ message });
+    }
+  );
+});
+// get sub_dept by dept_id
+app.get("/subdept/:dept_id", (req, res) => {
+  const deptId = req.params.dept_id;
+
+  connection.query(
+    `SELECT s.*, d.dept_name 
+    FROM sub_department s
+    LEFT JOIN dept_mast d ON s.dept_id = d.dept_id
+    WHERE s.dept_id = ?`,
+    [deptId],
+    (err, results) => {
+      if (err) {
+        console.error(err);
+        res.sendStatus(500);
+        return;
+      }
+      res.send(results);
+    }
+  );
+});
+
+//23/08/2023 get by id
+app.get("/subdeptbyid/:id", (req, res) => {
+  const id = req.params.id;
+  console.log(`Retrieving sub department by  ID: ${id}`);
+
+  const query = `SELECT s.*, d.dept_name 
+  FROM sub_department s
+  LEFT JOIN dept_mast d ON s.dept_id = d.dept_id
+  WHERE s.id = ?`;
+  connection.query(query, [id], (err, results) => {
+    if (err) {
+      console.error(err);
+      res.sendStatus(500); // Send HTTP status code 500 for server error
+      return;
+    }
+
+    if (results.length === 0) {
+      res.status(404).send("User not found");
+      return;
+    }
+
+    res.send(results[0]);
+  })  
+
+});
+
 module.exports = app;
